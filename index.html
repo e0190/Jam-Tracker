@@ -9,70 +9,82 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease; overflow: hidden; height: 100vh; display: flex; align-items: center; padding: 40px; }
+        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
         .bebas { font-family: 'Bebas Neue', cursive; }
-        .glass { background: rgba(0, 0, 0, 0.2); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Album Art - Fixed to Square */
-        .art-container { width: 45vw; height: 45vw; max-width: 500px; max-height: 500px; flex-shrink: 0; }
-        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.6); }
+        /* Album Art - Forced Square */
+        .art-container { width: 40vw; height: 40vw; max-width: 450px; max-height: 450px; flex-shrink: 0; }
+        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); }
 
         /* Text Scaling */
-        .title-text { font-size: clamp(3rem, 6vw, 6rem); line-height: 0.9; word-break: break-word; }
+        .title-text { font-size: clamp(2.5rem, 5.5vw, 5.5rem); line-height: 0.85; word-break: break-word; }
         
         /* Progress Bar */
-        .progress-bg { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; width: 100%; position: relative; cursor: pointer; }
+        .progress-bg { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; width: 100%; position: relative; }
         #progress-fill { height: 100%; background: white; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
 
-        button:active { transform: scale(0.9); }
-        .queue-item { cursor: pointer; transition: background 0.2s; }
-        .queue-item:hover { background: rgba(255,255,255,0.05); }
+        .queue-item { cursor: pointer; transition: all 0.2s; border-radius: 15px; }
+        .queue-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
+        
+        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-    <div id="main-dashboard" class="grid grid-cols-12 gap-16 w-full max-w-[1800px] mx-auto items-center" style="display: none; opacity: 0; transition: opacity 1s;">
+    <div id="setup-overlay">
+        <div class="glass p-12 rounded-[60px] max-w-lg w-full text-center border-2 border-white/5">
+            <h2 class="text-6xl bebas mb-8 tracking-tight italic">E19 DASHBOARD</h2>
+            <input type="text" id="jam-input" placeholder="PASTE JAM LINK" 
+                class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl mb-8 text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest">
+            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas tracking-tighter uppercase">
+                Connect & Launch
+            </button>
+        </div>
+    </div>
+
+    <div id="main-dashboard" class="grid grid-cols-12 gap-16 w-full max-w-[1600px] px-12 items-center" style="display: none; opacity: 0;">
         
-        <div class="col-span-7 flex flex-col gap-8">
+        <div class="col-span-7 flex flex-col gap-10">
             <div class="art-container">
                 <img id="art" src="" crossorigin="anonymous" class="album-art">
             </div>
             
             <div class="flex flex-col gap-4">
-                <h1 id="title" class="bebas title-text tracking-tighter uppercase">Loading...</h1>
+                <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
                 <p id="artist" class="text-3xl font-bold opacity-40 italic tracking-tight"></p>
                 
-                <div class="flex items-center gap-4 mt-4">
+                <div class="flex items-center gap-4 mt-6">
                     <span id="time-cur" class="text-xs opacity-50 font-mono">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
                     <span id="time-total" class="text-xs opacity-50 font-mono">0:00</span>
                 </div>
 
-                <div class="flex items-center gap-10 mt-2">
-                    <button onclick="control('previous')" class="opacity-60 hover:opacity-100 transition-opacity">
-                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
+                <div class="flex items-center gap-10 mt-4">
+                    <button onclick="control('previous')" class="opacity-40 hover:opacity-100 transition-all">
+                        <svg width="45" height="45" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
                     </button>
-                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-4 hover:scale-105 transition-transform">
-                        <svg id="play-icon" width="40" height="40" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-5 hover:scale-110 transition-all">
+                        <svg id="play-icon" width="45" height="45" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </button>
-                    <button onclick="control('next')" class="opacity-60 hover:opacity-100 transition-opacity">
-                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
+                    <button onclick="control('next')" class="opacity-40 hover:opacity-100 transition-all">
+                        <svg width="45" height="45" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
                     </button>
                 </div>
             </div>
         </div>
 
         <div class="col-span-5 flex flex-col h-[85vh] gap-8">
-            <div class="glass rounded-[40px] p-8 flex-grow overflow-hidden flex flex-col">
-                <h2 class="bebas text-xl opacity-30 mb-6 tracking-widest uppercase">Up Next</h2>
+            <div class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
+                <h2 class="bebas text-2xl opacity-20 mb-8 tracking-[0.3em] uppercase italic">Up Next</h2>
                 <div id="queue-list" class="space-y-4 overflow-y-auto pr-2"></div>
             </div>
 
-            <div class="glass rounded-[40px] p-6 flex items-center gap-6 border-l-4 border-white">
-                <div id="qrcode" class="bg-white p-2 rounded-xl"></div>
+            <div class="glass rounded-[50px] p-8 flex items-center gap-8 border-l-8 border-white">
+                <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-2xl"></div>
                 <div class="overflow-hidden">
-                    <p class="bebas text-lg opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
-                    <p id="jam-display-url" class="text-xs font-mono truncate opacity-40"></p>
+                    <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
+                    <p id="jam-display-url" class="text-sm font-mono truncate opacity-40 font-bold"></p>
                 </div>
             </div>
         </div>
@@ -84,46 +96,55 @@
         const colorThief = new ColorThief();
         let accessToken = null;
 
-        // AUTH & SETUP
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            if (code) {
-                const dashboard = document.getElementById('main-dashboard');
-                dashboard.style.display = 'grid';
-                setTimeout(() => dashboard.style.opacity = '1', 100);
-                exchangeToken(code);
-            } else {
-                window.location.href = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=user-read-currently-playing user-read-playback-state user-modify-playback-state&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-            }
+        function launch() {
+            const jamLink = document.getElementById('jam-input').value;
+            if (!jamLink) return alert("Please paste a Jam link first!");
             
-            const jam = sessionStorage.getItem('jam_link') || "No Link Provided";
-            document.getElementById('jam-display-url').innerText = jam;
-            new QRCode(document.getElementById("qrcode"), { text: jam, width: 80, height: 80 });
-        };
-
-        async function exchangeToken(code) {
-            const res = await fetch('/api/token', {
-                method: 'POST',
-                body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const data = await res.json();
-            if (data.access_token) {
-                accessToken = data.access_token;
-                updateLoop();
-            }
+            sessionStorage.setItem('jam_link', jamLink);
+            
+            // Redirect to Spotify for Auth
+            const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
+            window.location.href = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         }
 
-        // CORE LOGIC
+        async function exchangeToken(code) {
+            try {
+                const res = await fetch('/api/token', {
+                    method: 'POST',
+                    body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.access_token) {
+                    accessToken = data.access_token;
+                    startApp();
+                }
+            } catch (e) { console.error("Token Exchange Failed", e); }
+        }
+
+        function startApp() {
+            document.getElementById('setup-overlay').style.display = 'none';
+            const dashboard = document.getElementById('main-dashboard');
+            dashboard.style.display = 'grid';
+            setTimeout(() => dashboard.style.opacity = '1', 50);
+            
+            const jam = sessionStorage.getItem('jam_link');
+            document.getElementById('jam-display-url').innerText = jam;
+            document.getElementById('qrcode').innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
+
+            updateLoop();
+        }
+
         async function updateLoop() {
+            if (!accessToken) return;
             await fetchPlayback();
             await fetchQueue();
             setTimeout(updateLoop, 3000);
         }
 
         async function fetchPlayback() {
-            const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+            const res = await fetch('https://api.spotify.com/v1/me/player', {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             if (res.status === 200) {
@@ -140,35 +161,33 @@
                     };
                 }
 
-                // Progress
                 const percent = (data.progress_ms / data.item.duration_ms) * 100;
                 document.getElementById('progress-fill').style.width = percent + '%';
                 document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
                 document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
                 
-                // Play/Pause Icon
                 document.getElementById('play-icon').innerHTML = data.is_playing ? 
                     '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
             }
         }
 
         async function fetchQueue() {
-            const res = await fetch('https://developer.spotify.com/documentation/web-api/concepts/redirect_uri', {
+            const res = await fetch('https://api.spotify.com/v1/me/player/queue', {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             if (res.status === 200) {
                 const data = await res.json();
                 const container = document.getElementById('queue-list');
                 container.innerHTML = '';
-                data.queue.slice(0, 8).forEach(track => {
+                data.queue.slice(0, 6).forEach(track => {
                     const div = document.createElement('div');
-                    div.className = 'queue-item flex items-center gap-4 p-2 rounded-xl';
+                    div.className = 'queue-item flex items-center gap-4 p-3';
                     div.onclick = () => playSpecific(track.uri);
                     div.innerHTML = `
-                        <img src="${track.album.images[2].url}" class="w-12 h-12 rounded-lg">
+                        <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
                         <div class="overflow-hidden">
-                            <p class="bebas text-xl truncate leading-tight">${track.name}</p>
-                            <p class="text-xs opacity-40 truncate uppercase font-bold">${track.artists[0].name}</p>
+                            <p class="bebas text-2xl truncate tracking-tight leading-none mb-1">${track.name}</p>
+                            <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
                         </div>
                     `;
                     container.appendChild(div);
@@ -176,33 +195,26 @@
             }
         }
 
-        // CONTROLS
         async function control(cmd) {
-            let method = 'POST';
+            let method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
             let endpoint = cmd;
             if (cmd === 'toggle') {
-                const stateRes = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-                const state = await stateRes.json();
-                endpoint = state.is_playing ? 'pause' : 'play';
-                method = 'PUT';
-            } else if (cmd === 'play' || cmd === 'pause') {
-                method = 'PUT';
+                const s = await (await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
+                endpoint = s.is_playing ? 'pause' : 'play';
             }
-            
-            await fetch(`https://community.spotify.com/t5/Live-Ideas/Give-the-Spotify-Web-API-Access-to-Jams/idi-p/5643719{endpoint}`, {
-                method: method,
-                headers: { 'Authorization': `Bearer ${accessToken}` }
+            await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+                method: method, headers: { 'Authorization': `Bearer ${accessToken}` }
             });
-            setTimeout(fetchPlayback, 500);
+            setTimeout(fetchPlayback, 400);
         }
 
         async function playSpecific(uri) {
-            await fetch('https://community.spotify.com/t5/Spotify-for-Developers/Add-Spotify-API-support-for-Jams/td-p/7169789', {
+            await fetch('https://api.spotify.com/v1/me/player/play', {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${accessToken}` },
                 body: JSON.stringify({ uris: [uri] })
             });
-            setTimeout(updateLoop, 500);
+            setTimeout(updateLoop, 400);
         }
 
         function formatTime(ms) {
@@ -210,6 +222,26 @@
             const sec = ((ms % 60000) / 1000).toFixed(0);
             return min + ":" + (sec < 10 ? '0' : '') + sec;
         }
+
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const jam = sessionStorage.getItem('jam_link');
+
+            // If we have a code but NO jam link, we need to go back to entry
+            if (code && !jam) {
+                window.history.replaceState({}, document.title, "/"); 
+                document.getElementById('setup-overlay').style.display = 'flex';
+            } 
+            // If we have both, proceed to the dashboard
+            else if (code && jam) {
+                exchangeToken(code);
+            } 
+            // Default: Show the entry screen
+            else {
+                document.getElementById('setup-overlay').style.display = 'flex';
+            }
+        };
     </script>
 </body>
 </html>
