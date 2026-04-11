@@ -13,19 +13,19 @@
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Album Art - Forced Square */
-        .art-container { width: 40vw; height: 40vw; max-width: 450px; max-height: 450px; flex-shrink: 0; }
+        .art-container { width: 35vw; height: 35vw; max-width: 420px; max-height: 420px; flex-shrink: 0; margin: 0 auto; }
         .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); }
 
-        /* Text Scaling */
-        .title-text { font-size: clamp(2.5rem, 5.5vw, 5.5rem); line-height: 0.85; word-break: break-word; }
+        .title-text { font-size: clamp(2.5rem, 5vw, 5rem); line-height: 0.85; word-break: break-word; }
         
-        /* Progress Bar */
         .progress-bg { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; width: 100%; position: relative; }
         #progress-fill { height: 100%; background: white; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
 
+        /* No scroll, fixed height queue */
+        #queue-list { overflow: hidden; }
+
         .queue-item { cursor: pointer; transition: all 0.2s; border-radius: 15px; }
-        .queue-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
+        .queue-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.02); }
         
         #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: flex; align-items: center; justify-content: center; }
     </style>
@@ -43,44 +43,45 @@
         </div>
     </div>
 
-    <div id="main-dashboard" class="grid grid-cols-12 gap-16 w-full max-w-[1600px] px-12 items-center" style="display: none; opacity: 0;">
+    <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full max-w-[1700px] px-12 items-center" style="display: none; opacity: 0;">
         
-        <div class="col-span-7 flex flex-col gap-10">
-            <div class="art-container">
+        <div class="col-span-7 flex flex-col text-center">
+            <div class="art-container mb-10">
                 <img id="art" src="" crossorigin="anonymous" class="album-art">
             </div>
             
-            <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-2 px-10 items-center">
                 <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
-                <p id="artist" class="text-3xl font-bold opacity-40 italic tracking-tight"></p>
+                <p id="artist" class="text-2xl font-bold opacity-40 italic tracking-tight mb-6"></p>
                 
-                <div class="flex items-center gap-4 mt-6">
+                <div class="flex items-center gap-4 w-full max-w-2xl">
                     <span id="time-cur" class="text-xs opacity-50 font-mono">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
                     <span id="time-total" class="text-xs opacity-50 font-mono">0:00</span>
                 </div>
 
-                <div class="flex items-center gap-10 mt-4">
+                <div class="flex items-center justify-center gap-12 mt-8">
                     <button onclick="control('previous')" class="opacity-40 hover:opacity-100 transition-all">
-                        <svg width="45" height="45" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
+                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
                     </button>
-                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-5 hover:scale-110 transition-all">
-                        <svg id="play-icon" width="45" height="45" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-6 hover:scale-110 transition-all shadow-2xl">
+                        <svg id="play-icon" width="40" height="40" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </button>
                     <button onclick="control('next')" class="opacity-40 hover:opacity-100 transition-all">
-                        <svg width="45" height="45" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
+                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
                     </button>
                 </div>
             </div>
         </div>
 
-        <div class="col-span-5 flex flex-col h-[85vh] gap-8">
+        <div class="col-span-5 flex flex-col h-[85vh] gap-6">
             <div class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
-                <h2 class="bebas text-2xl opacity-20 mb-8 tracking-[0.3em] uppercase italic">Up Next</h2>
-                <div id="queue-list" class="space-y-4 overflow-y-auto pr-2"></div>
+                <h2 class="bebas text-2xl opacity-20 mb-6 tracking-[0.3em] uppercase italic">Up Next</h2>
+                <div id="queue-list" class="space-y-4">
+                    </div>
             </div>
 
-            <div class="glass rounded-[50px] p-8 flex items-center gap-8 border-l-8 border-white">
+            <div class="glass rounded-[50px] p-6 flex items-center gap-8 border-l-8 border-white">
                 <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-2xl"></div>
                 <div class="overflow-hidden">
                     <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
@@ -99,12 +100,9 @@
         function launch() {
             const jamLink = document.getElementById('jam-input').value;
             if (!jamLink) return alert("Please paste a Jam link first!");
-            
             sessionStorage.setItem('jam_link', jamLink);
-            
-            // Redirect to Spotify for Auth
             const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
-            window.location.href = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+            window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         }
 
         async function exchangeToken(code) {
@@ -119,7 +117,7 @@
                     accessToken = data.access_token;
                     startApp();
                 }
-            } catch (e) { console.error("Token Exchange Failed", e); }
+            } catch (e) { console.error(e); }
         }
 
         function startApp() {
@@ -127,12 +125,9 @@
             const dashboard = document.getElementById('main-dashboard');
             dashboard.style.display = 'grid';
             setTimeout(() => dashboard.style.opacity = '1', 50);
-            
             const jam = sessionStorage.getItem('jam_link');
             document.getElementById('jam-display-url').innerText = jam;
-            document.getElementById('qrcode').innerHTML = "";
             new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
-
             updateLoop();
         }
 
@@ -151,7 +146,6 @@
                 const data = await res.json();
                 document.getElementById('title').innerText = data.item.name;
                 document.getElementById('artist').innerText = data.item.artists[0].name;
-                
                 const img = document.getElementById('art');
                 if (img.src !== data.item.album.images[0].url) {
                     img.src = data.item.album.images[0].url;
@@ -160,12 +154,10 @@
                         document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
                     };
                 }
-
                 const percent = (data.progress_ms / data.item.duration_ms) * 100;
                 document.getElementById('progress-fill').style.width = percent + '%';
                 document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
                 document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
-                
                 document.getElementById('play-icon').innerHTML = data.is_playing ? 
                     '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
             }
@@ -179,14 +171,15 @@
                 const data = await res.json();
                 const container = document.getElementById('queue-list');
                 container.innerHTML = '';
-                data.queue.slice(0, 6).forEach(track => {
+                // Fixed to top 5 to avoid scrolling
+                data.queue.slice(0, 5).forEach(track => {
                     const div = document.createElement('div');
                     div.className = 'queue-item flex items-center gap-4 p-3';
                     div.onclick = () => playSpecific(track.uri);
                     div.innerHTML = `
                         <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
                         <div class="overflow-hidden">
-                            <p class="bebas text-2xl truncate tracking-tight leading-none mb-1">${track.name}</p>
+                            <p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p>
                             <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
                         </div>
                     `;
@@ -227,20 +220,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const jam = sessionStorage.getItem('jam_link');
-
-            // If we have a code but NO jam link, we need to go back to entry
-            if (code && !jam) {
-                window.history.replaceState({}, document.title, "/"); 
-                document.getElementById('setup-overlay').style.display = 'flex';
-            } 
-            // If we have both, proceed to the dashboard
-            else if (code && jam) {
-                exchangeToken(code);
-            } 
-            // Default: Show the entry screen
-            else {
-                document.getElementById('setup-overlay').style.display = 'flex';
-            }
+            if (code && jam) exchangeToken(code);
         };
     </script>
 </body>
