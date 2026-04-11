@@ -17,7 +17,6 @@
         #intro-text { font-size: 10vw; opacity: 0; animation: fadeInOut 2s ease-in-out forwards; }
         @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
 
-        /* Art scales to fill height better */
         .art-container { width: 45vh; height: 45vh; max-width: 600px; max-height: 600px; flex-shrink: 0; transition: all 0.8s ease; }
         .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; box-shadow: 0 50px 120px rgba(0,0,0,0.8); }
 
@@ -32,7 +31,6 @@
         .disabled { opacity: 0.2; cursor: not-allowed; }
         input[type="checkbox"] { width: 22px; height: 22px; accent-color: white; cursor: pointer; }
 
-        /* Fullscreen Layout adjustments */
         #main-dashboard.full-centered { flex-direction: column; text-align: center; }
         #main-dashboard.full-centered .art-container { width: 55vh; height: 55vh; }
     </style>
@@ -133,6 +131,7 @@
         const colorThief = new ColorThief();
         let accessToken = null;
         let config = {};
+        let lastTrackId = null;
 
         function toggleQRCheck() {
             const val = document.getElementById('jam-input').value;
@@ -213,67 +212,92 @@
 
         async function updateLoop() {
             await fetchPlayback();
-            if (config.queue) await fetchQueue();
+            // Queue is only fetched if config allows OR if the track changed
             setTimeout(updateLoop, 3000);
         }
 
         async function fetchPlayback() {
-            const res = await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            if (res.status === 200) {
-                const data = await res.json();
-                document.getElementById('title').innerText = data.item.name;
-                document.getElementById('artist').innerText = data.item.artists[0].name;
-                const img = document.getElementById('art');
-                if (img.src !== data.item.album.images[0].url) {
-                    img.src = data.item.album.images[0].url;
-                    img.onload = () => {
-                        if (config.bg) {
-                            const color = colorThief.getColor(img);
-                            document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-                            const brightness = (color[0] * 299 + color[1] * 587 + color[2] * 114) / 1000;
-                            document.body.style.color = brightness > 180 ? 'black' : 'white';
-                            document.getElementById('play-btn').querySelector('svg').style.fill = brightness > 180 ? 'white' : 'black';
-                        }
-                    };
+            try {
+                const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                if (res.status === 200) {
+                    const data = await res.json();
+                    document.getElementById('title').innerText = data.item.name;
+                    document.getElementById('artist').innerText = data.item.artists[0].name;
+
+                    // Trigger Queue Sync if track changed
+                    if (data.item.id !== lastTrackId) {
+                        lastTrackId = data.item.id;
+                        if (config.queue) fetchQueue();
+                    }
+
+                    const img = document.getElementById('art');
+                    if (img.src !== data.item.album.images[0].url) {
+                        img.src = data.item.album.images[0].url;
+                        img.onload = () => {
+                            if (config.bg) {
+                                const color = colorThief.getColor(img);
+                                document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                                const brightness = (color[0] * 299 + color[1] * 587 + color[2] * 114) / 1000;
+                                document.body.style.color = brightness > 180 ? 'black' : 'white';
+                                document.getElementById('play-btn').querySelector('svg').style.fill = brightness > 180 ? 'white' : 'black';
+                            }
+                        };
+                    }
+                    const percent = (data.progress_ms / data.item.duration_ms) * 100;
+                    document.getElementById('progress-fill').style.width = percent + '%';
+                    document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
+                    document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
+                    document.getElementById('play-icon').innerHTML = data.is_playing ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
                 }
-                const percent = (data.progress_ms / data.item.duration_ms) * 100;
-                document.getElementById('progress-fill').style.width = percent + '%';
-                document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
-                document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
-                document.getElementById('play-icon').innerHTML = data.is_playing ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
-            }
+            } catch (e) { console.error("Playback Fetch Error", e); }
         }
 
         async function fetchQueue() {
-            const res = await fetch('https://api.spotify.com/v1/me/player/queue', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            if (res.status === 200) {
-                const data = await res.json();
-                const container = document.getElementById('queue-list');
-                container.innerHTML = '';
-                data.queue.slice(0, 5).forEach(track => {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center gap-6 p-4 hover:bg-white/10 cursor-pointer rounded-3xl transition-all';
-                    div.onclick = () => playSpecific(track.uri);
-                    div.innerHTML = `<img src="${track.album.images[2].url}" class="w-16 h-16 rounded-2xl shadow-lg"><div class="overflow-hidden text-left"><p class="bebas text-3xl truncate leading-none mb-1">${track.name}</p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
-                    container.appendChild(div);
-                });
-            }
+            try {
+                const res = await fetch('https://api.spotify.com/v1/me/player/queue', { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                if (res.status === 200) {
+                    const data = await res.json();
+                    const container = document.getElementById('queue-list');
+                    container.innerHTML = '';
+                    
+                    // Filters out the current playing song from the queue list to keep it truly "Up Next"
+                    data.queue.slice(0, 5).forEach(track => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center gap-6 p-4 hover:bg-white/10 cursor-pointer rounded-3xl transition-all';
+                        div.onclick = () => playSpecific(track.uri);
+                        div.innerHTML = `<img src="${track.album.images[2].url}" class="w-16 h-16 rounded-2xl shadow-lg"><div class="overflow-hidden text-left"><p class="bebas text-3xl truncate leading-none mb-1">${track.name}</p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (e) { console.error("Queue Sync Error", e); }
         }
 
         async function control(cmd) {
             let method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
             let endpoint = cmd;
             if (cmd === 'toggle') {
-                const s = await (await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
+                const s = await (await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
                 endpoint = s.is_playing ? 'pause' : 'play';
             }
             await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, { method: method, headers: { 'Authorization': `Bearer ${accessToken}` } });
-            setTimeout(fetchPlayback, 400);
+            
+            // Forces immediate sync after control
+            setTimeout(() => {
+                fetchPlayback();
+                if (config.queue) fetchQueue();
+            }, 600);
         }
 
         async function playSpecific(uri) {
-            await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ uris: [uri] }) });
-            setTimeout(updateLoop, 400);
+            await fetch('https://api.spotify.com/v1/me/player/play', { 
+                method: 'PUT', 
+                headers: { 'Authorization': `Bearer ${accessToken}` }, 
+                body: JSON.stringify({ uris: [uri] }) 
+            });
+            setTimeout(() => {
+                fetchPlayback();
+                if (config.queue) fetchQueue();
+            }, 600);
         }
 
         function formatTime(ms) {
