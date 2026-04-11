@@ -9,36 +9,62 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease, color 0.5s ease; overflow: hidden; height: 100vh; margin: 0; }
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
+        /* Intro Animation */
+        #intro-screen { position: fixed; inset: 0; background: black; display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        #intro-text { font-size: 8vw; opacity: 0; animation: fadeInOut 2s ease-in-out forwards; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
+
+        /* Album Art */
         .art-container { width: 35vw; height: 35vw; max-width: 420px; max-height: 420px; flex-shrink: 0; margin: 0 auto; }
-        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); }
+        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
 
         .title-text { font-size: clamp(2.5rem, 5vw, 5rem); line-height: 0.85; word-break: break-word; }
-        
-        .progress-bg { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; width: 100%; position: relative; }
-        #progress-fill { height: 100%; background: white; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
+        .progress-bg { height: 6px; background: rgba(128,128,128,0.2); border-radius: 10px; width: 100%; position: relative; }
+        #progress-fill { height: 100%; background: currentColor; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
 
-        /* No scroll, fixed height queue */
-        #queue-list { overflow: hidden; }
-
-        .queue-item { cursor: pointer; transition: all 0.2s; border-radius: 15px; }
-        .queue-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.02); }
+        .queue-item { border-radius: 15px; transition: all 0.2s; }
+        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; }
         
-        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        /* Checkbox styling */
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: white; }
     </style>
 </head>
 <body>
 
+    <div id="intro-screen"><div id="intro-text" class="bebas">MADE BY E19</div></div>
+
     <div id="setup-overlay">
-        <div class="glass p-12 rounded-[60px] max-w-lg w-full text-center border-2 border-white/5">
-            <h2 class="text-6xl bebas mb-8 tracking-tight italic">E19 DASHBOARD</h2>
-            <input type="text" id="jam-input" placeholder="PASTE JAM LINK" 
-                class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl mb-8 text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest">
-            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas tracking-tighter uppercase">
-                Connect & Launch
+        <div class="glass p-10 rounded-[50px] max-w-xl w-full border-2 border-white/10">
+            <h2 class="text-5xl bebas mb-6 text-center italic">Dashboard Config</h2>
+            
+            <div class="space-y-6 mb-8">
+                <div>
+                    <label class="bebas text-xl opacity-50 block mb-2">Jam Link</label>
+                    <input type="text" id="jam-input" placeholder="PASTE LINK" class="w-full bg-white/5 border border-white/20 p-4 rounded-2xl text-white outline-none focus:border-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="flex items-center gap-3 glass p-4 rounded-2xl cursor-pointer">
+                        <input type="checkbox" id="show-queue" checked> <span class="bebas text-xl">Show Queue</span>
+                    </label>
+                    <label class="flex items-center gap-3 glass p-4 rounded-2xl cursor-pointer">
+                        <input type="checkbox" id="show-jam" checked> <span class="bebas text-xl">Show Jam QR</span>
+                    </label>
+                    <label class="flex items-center gap-3 glass p-4 rounded-2xl cursor-pointer">
+                        <input type="checkbox" id="show-controls" checked> <span class="bebas text-xl">Show Controls</span>
+                    </label>
+                    <label class="flex items-center gap-3 glass p-4 rounded-2xl cursor-pointer">
+                        <input type="checkbox" id="use-colors" checked> <span class="bebas text-xl">Dynamic BG</span>
+                    </label>
+                </div>
+            </div>
+
+            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas uppercase italic">
+                Connect Spotify
             </button>
         </div>
     </div>
@@ -52,7 +78,7 @@
             
             <div class="flex flex-col gap-2 px-10 items-center">
                 <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
-                <p id="artist" class="text-2xl font-bold opacity-40 italic tracking-tight mb-6"></p>
+                <p id="artist" class="text-2xl font-bold opacity-60 italic tracking-tight mb-6"></p>
                 
                 <div class="flex items-center gap-4 w-full max-w-2xl">
                     <span id="time-cur" class="text-xs opacity-50 font-mono">0:00</span>
@@ -60,29 +86,22 @@
                     <span id="time-total" class="text-xs opacity-50 font-mono">0:00</span>
                 </div>
 
-                <div class="flex items-center justify-center gap-12 mt-8">
-                    <button onclick="control('previous')" class="opacity-40 hover:opacity-100 transition-all">
-                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
-                    </button>
-                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-6 hover:scale-110 transition-all shadow-2xl">
-                        <svg id="play-icon" width="40" height="40" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    </button>
-                    <button onclick="control('next')" class="opacity-40 hover:opacity-100 transition-all">
-                        <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg>
-                    </button>
+                <div id="control-hub" class="flex items-center justify-center gap-12 mt-8">
+                    <button onclick="control('previous')" class="hover:scale-110 transition-all"><svg width="40" height="40" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
+                    <button onclick="control('toggle')" id="play-btn" class="bg-current rounded-full p-6 hover:scale-110 transition-all shadow-2xl"><svg id="play-icon" width="40" height="40" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button onclick="control('next')" class="hover:scale-110 transition-all"><svg width="40" height="40" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
                 </div>
             </div>
         </div>
 
         <div class="col-span-5 flex flex-col h-[85vh] gap-6">
-            <div class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
+            <div id="queue-card" class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
                 <h2 class="bebas text-2xl opacity-20 mb-6 tracking-[0.3em] uppercase italic">Up Next</h2>
-                <div id="queue-list" class="space-y-4">
-                    </div>
+                <div id="queue-list" class="space-y-4"></div>
             </div>
 
-            <div class="glass rounded-[50px] p-6 flex items-center gap-8 border-l-8 border-white">
-                <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-2xl"></div>
+            <div id="jam-card" class="glass rounded-[50px] p-6 flex items-center gap-8 border-l-8 border-white">
+                <div id="qrcode" class="bg-white p-2 rounded-2xl"></div>
                 <div class="overflow-hidden">
                     <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
                     <p id="jam-display-url" class="text-sm font-mono truncate opacity-40 font-bold"></p>
@@ -96,52 +115,66 @@
         const REDIRECT_URI = window.location.origin + '/';
         const colorThief = new ColorThief();
         let accessToken = null;
+        let config = {};
+
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById('intro-screen').style.display = 'none';
+                const urlParams = new URLSearchParams(window.location.search);
+                const code = urlParams.get('code');
+                if (code) {
+                    config = JSON.parse(sessionStorage.getItem('dash_config') || '{}');
+                    exchangeToken(code);
+                } else {
+                    document.getElementById('setup-overlay').style.display = 'flex';
+                }
+            }, 2500);
+        };
 
         function launch() {
-            const jamLink = document.getElementById('jam-input').value;
-            if (!jamLink) return alert("Please paste a Jam link first!");
-            sessionStorage.setItem('jam_link', jamLink);
+            config = {
+                jam: document.getElementById('jam-input').value,
+                queue: document.getElementById('show-queue').checked,
+                qr: document.getElementById('show-jam').checked,
+                controls: document.getElementById('show-controls').checked,
+                bg: document.getElementById('use-colors').checked
+            };
+            sessionStorage.setItem('dash_config', JSON.stringify(config));
             const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
-            window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+            window.location.href = `https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         }
 
         async function exchangeToken(code) {
-            try {
-                const res = await fetch('/api/token', {
-                    method: 'POST',
-                    body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (data.access_token) {
-                    accessToken = data.access_token;
-                    startApp();
-                }
-            } catch (e) { console.error(e); }
+            const res = await fetch('/api/token', { method: 'POST', body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }), headers: { 'Content-Type': 'application/json' } });
+            const data = await res.json();
+            if (data.access_token) {
+                accessToken = data.access_token;
+                applyConfig();
+                updateLoop();
+            }
         }
 
-        function startApp() {
+        function applyConfig() {
             document.getElementById('setup-overlay').style.display = 'none';
-            const dashboard = document.getElementById('main-dashboard');
-            dashboard.style.display = 'grid';
-            setTimeout(() => dashboard.style.opacity = '1', 50);
-            const jam = sessionStorage.getItem('jam_link');
-            document.getElementById('jam-display-url').innerText = jam;
-            new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
-            updateLoop();
+            document.getElementById('main-dashboard').style.display = 'grid';
+            setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
+            
+            if (!config.queue) document.getElementById('queue-card').style.display = 'none';
+            if (!config.qr) document.getElementById('jam-card').style.display = 'none';
+            if (!config.controls) document.getElementById('control-hub').style.visibility = 'hidden';
+            
+            document.getElementById('jam-display-url').innerText = config.jam;
+            new QRCode(document.getElementById("qrcode"), { text: config.jam, width: 110, height: 110 });
         }
 
         async function updateLoop() {
-            if (!accessToken) return;
             await fetchPlayback();
-            await fetchQueue();
+            if (config.queue) await fetchQueue();
             setTimeout(updateLoop, 3000);
         }
 
         async function fetchPlayback() {
-            const res = await fetch('https://api.spotify.com/v1/me/player', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            const res = await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } });
             if (res.status === 200) {
                 const data = await res.json();
                 document.getElementById('title').innerText = data.item.name;
@@ -150,39 +183,35 @@
                 if (img.src !== data.item.album.images[0].url) {
                     img.src = data.item.album.images[0].url;
                     img.onload = () => {
-                        const color = colorThief.getColor(img);
-                        document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        if (config.bg) {
+                            const color = colorThief.getColor(img);
+                            document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                            // Brightness check: (R*299 + G*587 + B*114) / 1000
+                            const brightness = (color[0] * 299 + color[1] * 587 + color[2] * 114) / 1000;
+                            document.body.style.color = brightness > 180 ? 'black' : 'white';
+                            document.getElementById('play-btn').querySelector('svg').style.fill = brightness > 180 ? 'white' : 'black';
+                        }
                     };
                 }
                 const percent = (data.progress_ms / data.item.duration_ms) * 100;
                 document.getElementById('progress-fill').style.width = percent + '%';
                 document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
                 document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
-                document.getElementById('play-icon').innerHTML = data.is_playing ? 
-                    '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+                document.getElementById('play-icon').innerHTML = data.is_playing ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
             }
         }
 
         async function fetchQueue() {
-            const res = await fetch('https://api.spotify.com/v1/me/player/queue', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            const res = await fetch('https://api.spotify.com/v1/me/player/queue', { headers: { 'Authorization': `Bearer ${accessToken}` } });
             if (res.status === 200) {
                 const data = await res.json();
                 const container = document.getElementById('queue-list');
                 container.innerHTML = '';
-                // Fixed to top 5 to avoid scrolling
                 data.queue.slice(0, 5).forEach(track => {
                     const div = document.createElement('div');
-                    div.className = 'queue-item flex items-center gap-4 p-3';
+                    div.className = 'queue-item flex items-center gap-4 p-3 hover:bg-white/10 cursor-pointer';
                     div.onclick = () => playSpecific(track.uri);
-                    div.innerHTML = `
-                        <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
-                        <div class="overflow-hidden">
-                            <p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p>
-                            <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
-                        </div>
-                    `;
+                    div.innerHTML = `<img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg"><div class="overflow-hidden"><p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p><p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
                     container.appendChild(div);
                 });
             }
@@ -195,18 +224,12 @@
                 const s = await (await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
                 endpoint = s.is_playing ? 'pause' : 'play';
             }
-            await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
-                method: method, headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, { method: method, headers: { 'Authorization': `Bearer ${accessToken}` } });
             setTimeout(fetchPlayback, 400);
         }
 
         async function playSpecific(uri) {
-            await fetch('https://api.spotify.com/v1/me/player/play', {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${accessToken}` },
-                body: JSON.stringify({ uris: [uri] })
-            });
+            await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ uris: [uri] }) });
             setTimeout(updateLoop, 400);
         }
 
@@ -215,13 +238,6 @@
             const sec = ((ms % 60000) / 1000).toFixed(0);
             return min + ":" + (sec < 10 ? '0' : '') + sec;
         }
-
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            const jam = sessionStorage.getItem('jam_link');
-            if (code && jam) exchangeToken(code);
-        };
     </script>
 </body>
 </html>
