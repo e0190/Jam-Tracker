@@ -7,18 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap');
-        
         body { 
             background-color: #000; 
             color: white; 
             font-family: 'Inter', sans-serif;
-            transition: background-color 2s ease;
+            transition: background-color 2s cubic-bezier(0.4, 0, 0.2, 1);
             overflow: hidden;
             margin: 0;
             height: 100vh;
         }
+
+        .bebas { font-family: 'Bebas Neue', sans-serif; }
 
         #intro-screen {
             position: fixed;
@@ -32,9 +33,9 @@
         }
 
         #intro-text {
-            font-size: 5vw;
+            font-size: 8vw;
             font-weight: 900;
-            letter-spacing: -4px;
+            letter-spacing: -2px;
             opacity: 0;
             animation: fadeInOut 2s ease-in-out forwards 0.3s;
         }
@@ -46,9 +47,7 @@
             100% { opacity: 0; transform: scale(1.1); }
         }
 
-        @keyframes fadeOutView {
-            to { visibility: hidden; opacity: 0; }
-        }
+        @keyframes fadeOutView { to { visibility: hidden; opacity: 0; } }
 
         #setup-overlay {
             position: fixed;
@@ -65,84 +64,82 @@
         @keyframes fadeIn { to { opacity: 1; } }
 
         .glass { 
-            background: rgba(255, 255, 255, 0.05); 
-            backdrop-filter: blur(30px); 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(40px); 
             border: 1px solid rgba(255, 255, 255, 0.1); 
         }
 
         #main-dashboard {
             opacity: 0;
-            transition: opacity 1s ease;
+            transition: opacity 1.5s ease;
             display: none;
             height: 100vh;
         }
 
         .album-art { 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            border-radius: 12px;
-            max-height: 55vh; /* Prevents it from being too tall */
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+            border-radius: 4px;
+            max-height: 50vh;
             width: auto;
+            border: 1px solid rgba(255,255,255,0.1);
         }
 
         #queue-list::-webkit-scrollbar { width: 4px; }
         #queue-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
     </style>
 </head>
-<body class="p-8">
+<body class="p-10">
 
     <div id="intro-screen">
-        <div id="intro-text">Made by E19</div>
+        <div id="intro-text" class="bebas">Made by E19</div>
     </div>
 
     <div id="setup-overlay">
-        <div class="glass p-10 rounded-[40px] max-w-md w-full text-center border-2 border-white/10 shadow-2xl">
-            <h2 class="text-4xl font-black mb-4 uppercase italic tracking-tighter">Enter Jam Link</h2>
-            <input type="text" id="jam-input" placeholder="Paste Spotify Link..." 
-                class="w-full bg-white/5 border-2 border-white/10 p-4 rounded-2xl mb-6 text-white outline-none focus:border-white transition-all text-center text-lg">
-            <button onclick="launch()" class="w-full bg-white text-black font-black p-4 rounded-2xl hover:bg-gray-200 transition-all text-xl uppercase tracking-tight">
+        <div class="glass p-12 rounded-[60px] max-w-lg w-full text-center border-2 border-white/5">
+            <h2 class="text-5xl bebas mb-6 tracking-tight">Enter Jam Link</h2>
+            <input type="text" id="jam-input" placeholder="PASTE LINK HERE" 
+                class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl mb-8 text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest">
+            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas tracking-tighter">
                 Launch Dashboard
             </button>
         </div>
     </div>
 
-    <div id="main-dashboard" class="grid grid-cols-12 gap-8 items-center">
+    <div id="main-dashboard" class="grid grid-cols-12 gap-12 items-center h-full">
         <div class="col-span-7 flex flex-col justify-center h-full">
-            <img id="art" src="https://via.placeholder.com/600" crossorigin="anonymous" class="album-art aspect-square object-cover mb-8">
+            <img id="art" src="" crossorigin="anonymous" class="album-art aspect-square object-cover mb-10">
             <div>
-                <h1 id="title" class="text-[6vw] font-black uppercase tracking-tighter leading-[0.9] italic mb-4">Not Playing</h1>
-                <p id="artist" class="text-3xl font-medium text-white/60 tracking-tight italic">Waiting for Spotify...</p>
+                <h1 id="title" class="bebas text-[9vw] leading-[0.8] mb-4 tracking-tighter">Waiting...</h1>
+                <p id="artist" class="text-4xl font-bold text-white/40 tracking-tight italic">Connect Spotify</p>
             </div>
         </div>
 
-        <div class="col-span-5 flex flex-col h-[85vh] space-y-6">
-            <div class="glass rounded-[40px] p-8 flex-grow overflow-hidden flex flex-col">
-                <h2 class="text-lg font-black italic tracking-[0.2em] opacity-30 mb-6 uppercase">Queue</h2>
-                <div id="queue-list" class="space-y-6 overflow-y-auto pr-2">
-                    <div class="flex items-center gap-4 opacity-20">
-                        <div class="w-12 h-12 bg-white/10 rounded-lg"></div>
-                        <div class="h-3 bg-white/10 w-24 rounded"></div>
-                    </div>
+        <div class="col-span-5 flex flex-col h-[80vh] space-y-8">
+            <div class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
+                <h2 class="bebas text-2xl opacity-20 mb-8 tracking-widest">Up Next</h2>
+                <div id="queue-list" class="space-y-8 overflow-y-auto pr-2">
+                    <p class="text-white/10 italic">Queue active on play...</p>
                 </div>
             </div>
 
-            <div class="glass rounded-[40px] p-6 flex items-center gap-6 border-l-4 border-white">
-                <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-xl"></div>
+            <div class="glass rounded-[50px] p-8 flex items-center gap-8">
+                <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-2xl"></div>
                 <div class="overflow-hidden">
-                    <p class="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-1">Scan to Join Jam</p>
-                    <p id="jam-display-url" class="text-sm font-mono truncate opacity-60"></p>
+                    <p class="bebas text-lg opacity-30 mb-1 tracking-widest">Scan to Join</p>
+                    <p id="jam-display-url" class="text-sm font-mono truncate opacity-50"></p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const CLIENT_ID = 'c43fb52c4e2c49499f2802ccd23699fb'; // <--- MUST BE YOUR REAL ID
+        const CLIENT_ID = 'c43fb52c4e2c49499f2802ccd23699fb'; // <--- MUST BE YOUR ID
         const REDIRECT_URI = window.location.origin + '/';
         const colorThief = new ColorThief();
 
         function launch() {
             const jamLink = document.getElementById('jam-input').value;
-            if (!jamLink) return alert("Enter a valid link!");
+            if (!jamLink) return alert("Link required!");
 
             document.getElementById('setup-overlay').style.display = 'none';
             document.getElementById('main-dashboard').style.display = 'grid';
@@ -150,13 +147,8 @@
 
             document.getElementById('jam-display-url').innerText = jamLink;
             document.getElementById('qrcode').innerHTML = ""; 
-            new QRCode(document.getElementById("qrcode"), { 
-                text: jamLink, 
-                width: 100, 
-                height: 100
-            });
+            new QRCode(document.getElementById("qrcode"), { text: jamLink, width: 120, height: 120 });
 
-            // OAuth Check
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             
@@ -200,19 +192,22 @@
                 });
                 if (res.status === 200) {
                     const data = await res.json();
-                    if (document.getElementById('title').innerText !== data.item.name) {
+                    if (data && data.item) {
                         document.getElementById('title').innerText = data.item.name;
                         document.getElementById('artist').innerText = data.item.artists[0].name;
                         document.getElementById('art').src = data.item.album.images[0].url;
                         updateTheme();
+                    } else {
+                        document.getElementById('title').innerText = "Paused";
+                        document.body.style.backgroundColor = "#000";
                     }
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Update failed", e); }
         }
 
         function startTracking(token) {
             fetchSpotify(token);
-            setInterval(() => fetchSpotify(token), 4000);
+            setInterval(() => fetchSpotify(token), 3000);
         }
 
         window.onload = () => {
