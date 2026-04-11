@@ -9,28 +9,32 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease, color 0.5s ease; overflow: hidden; height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; }
+        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s ease, color 0.5s ease; overflow: hidden; height: 100vh; width: 100vw; margin: 0; display: flex; align-items: center; justify-content: center; }
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
         #intro-screen { position: fixed; inset: 0; background: black; display: flex; align-items: center; justify-content: center; z-index: 2000; }
-        #intro-text { font-size: 8vw; opacity: 0; animation: fadeInOut 2s ease-in-out forwards; }
+        #intro-text { font-size: 10vw; opacity: 0; animation: fadeInOut 2s ease-in-out forwards; }
         @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
 
-        .art-container { width: 35vw; height: 35vw; max-width: 450px; max-height: 450px; flex-shrink: 0; }
-        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); }
+        /* Art scales to fill height better */
+        .art-container { width: 45vh; height: 45vh; max-width: 600px; max-height: 600px; flex-shrink: 0; transition: all 0.8s ease; }
+        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; box-shadow: 0 50px 120px rgba(0,0,0,0.8); }
 
-        .title-text { font-size: clamp(2.5rem, 5vw, 5.5rem); line-height: 0.85; word-break: break-word; }
-        .progress-bg { height: 8px; background: rgba(128,128,128,0.2); border-radius: 10px; width: 100%; }
-        #progress-fill { height: 100%; background: currentColor; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
+        .title-text { font-size: clamp(3rem, 7vw, 8rem); line-height: 0.8; word-break: break-word; }
+        .progress-bg { height: 10px; background: rgba(128,128,128,0.2); border-radius: 20px; width: 100%; }
+        #progress-fill { height: 100%; background: currentColor; border-radius: 20px; width: 0%; transition: width 0.5s linear; }
 
-        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; }
+        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; }
         
-        /* Interactive Config Styling */
         .check-card { cursor: pointer; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.1); }
         .check-card:hover:not(.disabled) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
         .disabled { opacity: 0.2; cursor: not-allowed; }
-        input[type="checkbox"] { width: 18px; height: 18px; accent-color: white; cursor: pointer; }
+        input[type="checkbox"] { width: 22px; height: 22px; accent-color: white; cursor: pointer; }
+
+        /* Fullscreen Layout adjustments */
+        #main-dashboard.full-centered { flex-direction: column; text-align: center; }
+        #main-dashboard.full-centered .art-container { width: 55vh; height: 55vh; }
     </style>
 </head>
 <body>
@@ -38,85 +42,85 @@
     <div id="intro-screen"><div id="intro-text" class="bebas">MADE BY E19</div></div>
 
     <div id="setup-overlay">
-        <div class="glass p-10 rounded-[50px] max-w-2xl w-full border-2 border-white/10 mx-4">
-            <h2 class="text-5xl bebas mb-8 text-center italic tracking-tight">Coustomize Dashboard</h2>
+        <div class="glass p-10 rounded-[60px] max-w-3xl w-full border-2 border-white/10 mx-4 my-10">
+            <h2 class="text-6xl bebas mb-8 text-center italic tracking-tight">E19 DASHBOARD</h2>
             
             <div class="space-y-4 mb-10">
                 <div id="jam-input-area">
-                    <label class="bebas text-xl opacity-50 block mb-2 px-2 uppercase">Jam Link (Required for QR)</label>
-                    <input type="text" id="jam-input" oninput="toggleQRCheck()" placeholder="PASTE SPOTIFY JAM LINK HERE" 
-                        class="w-full bg-white/5 border border-white/10 p-5 rounded-3xl text-white outline-none focus:border-white transition-all text-center">
+                    <label class="bebas text-2xl opacity-50 block mb-2 px-2 uppercase">Spotify Jam Link</label>
+                    <input type="text" id="jam-input" oninput="toggleQRCheck()" placeholder="PASTE LINK HERE" 
+                        class="w-full bg-white/5 border border-white/10 p-6 rounded-[35px] text-white outline-none focus:border-white transition-all text-center text-xl">
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <label class="check-card flex items-center justify-between p-5 rounded-3xl glass">
-                        <span class="bebas text-xl uppercase italic">Show Queue</span>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="check-card flex items-center justify-between p-6 rounded-[30px] glass">
+                        <span class="bebas text-2xl uppercase italic">Show Queue</span>
                         <input type="checkbox" id="show-queue" checked>
                     </label>
-                    <label id="qr-label" class="check-card flex items-center justify-between p-5 rounded-3xl glass disabled">
-                        <span class="bebas text-xl uppercase italic">Show Jam QR</span>
+                    <label id="qr-label" class="check-card flex items-center justify-between p-6 rounded-[30px] glass disabled">
+                        <span class="bebas text-2xl uppercase italic">Show Jam QR</span>
                         <input type="checkbox" id="show-jam" disabled>
                     </label>
-                    <label class="check-card flex items-center justify-between p-5 rounded-3xl glass">
-                        <span class="bebas text-xl uppercase italic">Playback Controls</span>
+                    <label class="check-card flex items-center justify-between p-6 rounded-[30px] glass">
+                        <span class="bebas text-2xl uppercase italic">Playback Controls</span>
                         <input type="checkbox" id="show-controls" checked>
                     </label>
-                    <label class="check-card flex items-center justify-between p-5 rounded-3xl glass">
-                        <span class="bebas text-xl uppercase italic">Dynamic Background</span>
+                    <label class="check-card flex items-center justify-between p-6 rounded-[30px] glass">
+                        <span class="bebas text-2xl uppercase italic">Dynamic Background</span>
                         <input type="checkbox" id="use-colors" checked>
                     </label>
-                    <label class="check-card flex items-center justify-between p-5 rounded-3xl glass">
-                        <span class="bebas text-xl uppercase italic">Progress Bar</span>
+                    <label class="check-card flex items-center justify-between p-6 rounded-[30px] glass">
+                        <span class="bebas text-2xl uppercase italic">Progress Bar</span>
                         <input type="checkbox" id="show-progress" checked>
                     </label>
-                    <label class="check-card flex items-center justify-between p-5 rounded-3xl glass">
-                        <span class="bebas text-xl uppercase italic">Artist Name</span>
+                    <label class="check-card flex items-center justify-between p-6 rounded-[30px] glass">
+                        <span class="bebas text-2xl uppercase italic">Artist Name</span>
                         <input type="checkbox" id="show-artist" checked>
                     </label>
                 </div>
             </div>
 
-            <button onclick="launch()" class="w-full bg-white text-black font-black p-6 rounded-[30px] hover:bg-gray-200 transition-all text-3xl bebas uppercase italic">
+            <button onclick="launch()" class="w-full bg-white text-black font-black p-6 rounded-[35px] hover:bg-gray-200 transition-all text-4xl bebas uppercase italic">
                 Launch Dashboard
             </button>
         </div>
     </div>
 
-    <div id="main-dashboard" class="flex flex-row items-center justify-center gap-16 w-full px-12 transition-all duration-1000" style="display: none; opacity: 0;">
+    <div id="main-dashboard" class="flex flex-row items-center justify-center gap-24 w-full h-full px-16 transition-all duration-1000" style="display: none; opacity: 0;">
         
-        <div id="player-unit" class="flex flex-col items-center text-center max-w-3xl transition-all duration-700">
-            <div class="art-container mb-10">
+        <div id="player-unit" class="flex flex-col items-center text-center flex-grow max-w-4xl transition-all duration-700">
+            <div class="art-container mb-12">
                 <img id="art" src="" crossorigin="anonymous" class="album-art">
             </div>
             
-            <div class="flex flex-col gap-2 w-full items-center">
+            <div class="flex flex-col gap-4 w-full items-center">
                 <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
-                <p id="artist" class="text-3xl font-bold opacity-60 italic tracking-tight mb-6"></p>
+                <p id="artist" class="text-4xl font-bold opacity-60 italic tracking-tight mb-8"></p>
                 
-                <div id="progress-container" class="flex items-center gap-4 w-full max-w-2xl mb-4">
-                    <span id="time-cur" class="text-xs opacity-50 font-mono">0:00</span>
+                <div id="progress-container" class="flex items-center gap-6 w-full max-w-3xl mb-6">
+                    <span id="time-cur" class="text-sm opacity-50 font-mono">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
-                    <span id="time-total" class="text-xs opacity-50 font-mono">0:00</span>
+                    <span id="time-total" class="text-sm opacity-50 font-mono">0:00</span>
                 </div>
 
-                <div id="control-hub" class="flex items-center justify-center gap-12 mt-4">
-                    <button onclick="control('previous')" class="hover:scale-110 transition-all"><svg width="45" height="45" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
-                    <button onclick="control('toggle')" id="play-btn" class="bg-current rounded-full p-6 hover:scale-110 transition-all shadow-2xl"><svg id="play-icon" width="45" height="45" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-                    <button onclick="control('next')" class="hover:scale-110 transition-all"><svg width="45" height="45" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
+                <div id="control-hub" class="flex items-center justify-center gap-16 mt-4">
+                    <button onclick="control('previous')" class="hover:scale-125 transition-all opacity-60 hover:opacity-100"><svg width="55" height="55" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
+                    <button onclick="control('toggle')" id="play-btn" class="bg-current rounded-full p-8 hover:scale-110 transition-all shadow-2xl"><svg id="play-icon" width="55" height="55" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button onclick="control('next')" class="hover:scale-125 transition-all opacity-60 hover:opacity-100"><svg width="55" height="55" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
                 </div>
             </div>
         </div>
 
-        <div id="sidebar-unit" class="flex flex-col h-[85vh] gap-6 w-[450px] flex-shrink-0 transition-all duration-700">
-            <div id="queue-card" class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
-                <h2 class="bebas text-2xl opacity-20 mb-6 tracking-[0.3em] uppercase italic">Up Next</h2>
-                <div id="queue-list" class="space-y-4"></div>
+        <div id="sidebar-unit" class="flex flex-col h-[90vh] gap-8 w-[500px] flex-shrink-0 transition-all duration-700">
+            <div id="queue-card" class="glass rounded-[60px] p-12 flex-grow overflow-hidden flex flex-col">
+                <h2 class="bebas text-3xl opacity-20 mb-8 tracking-[0.4em] uppercase italic">Up Next</h2>
+                <div id="queue-list" class="space-y-6"></div>
             </div>
 
-            <div id="jam-card" class="glass rounded-[50px] p-8 flex items-center gap-8 border-l-8 border-white">
-                <div id="qrcode" class="bg-white p-2 rounded-2xl"></div>
+            <div id="jam-card" class="glass rounded-[60px] p-10 flex items-center gap-10 border-l-[12px] border-white">
+                <div id="qrcode" class="bg-white p-2 rounded-3xl"></div>
                 <div class="overflow-hidden">
-                    <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
+                    <p class="bebas text-2xl opacity-30 tracking-widest uppercase mb-2">Join Jam</p>
                     <p id="jam-display-url" class="text-sm font-mono truncate opacity-40 font-bold"></p>
                 </div>
             </div>
@@ -185,13 +189,13 @@
 
         function applyConfig() {
             document.getElementById('setup-overlay').style.display = 'none';
-            document.getElementById('main-dashboard').style.display = 'flex';
-            setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
+            const dash = document.getElementById('main-dashboard');
+            dash.style.display = 'flex';
+            setTimeout(() => dash.style.opacity = '1', 50);
             
-            // Auto-cropping / Centering Logic
             if (!config.queue && !config.qr) {
                 document.getElementById('sidebar-unit').style.display = 'none';
-                document.getElementById('player-unit').classList.add('mx-auto');
+                dash.classList.add('full-centered');
             } else {
                 if (!config.queue) document.getElementById('queue-card').style.display = 'none';
                 if (!config.qr) document.getElementById('jam-card').style.display = 'none';
@@ -203,7 +207,7 @@
             
             if (config.qr) {
                 document.getElementById('jam-display-url').innerText = config.jam;
-                new QRCode(document.getElementById("qrcode"), { text: config.jam, width: 110, height: 110 });
+                new QRCode(document.getElementById("qrcode"), { text: config.jam, width: 140, height: 140 });
             }
         }
 
@@ -248,9 +252,9 @@
                 container.innerHTML = '';
                 data.queue.slice(0, 5).forEach(track => {
                     const div = document.createElement('div');
-                    div.className = 'flex items-center gap-4 p-3 hover:bg-white/10 cursor-pointer rounded-2xl transition-all';
+                    div.className = 'flex items-center gap-6 p-4 hover:bg-white/10 cursor-pointer rounded-3xl transition-all';
                     div.onclick = () => playSpecific(track.uri);
-                    div.innerHTML = `<img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg"><div class="overflow-hidden text-left"><p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p><p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
+                    div.innerHTML = `<img src="${track.album.images[2].url}" class="w-16 h-16 rounded-2xl shadow-lg"><div class="overflow-hidden text-left"><p class="bebas text-3xl truncate leading-none mb-1">${track.name}</p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
                     container.appendChild(div);
                 });
             }
