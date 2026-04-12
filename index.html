@@ -14,9 +14,9 @@
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
         /* Intro Animation */
-        #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; transition: opacity 1s ease; }
+        #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
         #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
-        @keyframes fadeInOut { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes fadeInOut { 0% { opacity: 0; } 40% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 
         .art-container { width: 35vw; height: 35vw; max-width: 420px; max-height: 420px; flex-shrink: 0; margin: 0 auto; }
         .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); }
@@ -32,7 +32,7 @@
         
         #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; }
         .toggle-card { background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-        input[type="checkbox"] { width: 20px; height: 20px; accent-color: white; }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: white; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -42,7 +42,7 @@
     </div>
 
     <div id="setup-overlay">
-        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5">
+        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5 mx-4">
             <h2 class="text-5xl bebas mb-8 tracking-tight italic text-center">DASHBOARD CONFIG</h2>
             
             <div class="space-y-4 mb-10">
@@ -130,20 +130,21 @@
         let config = {};
 
         window.onload = () => {
-            // Wait for intro
-            setTimeout(() => {
-                const urlParams = new URLSearchParams(window.location.search);
-                const code = urlParams.get('code');
-                const jam = sessionStorage.getItem('jam_link');
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
 
-                if (code && jam) {
-                    document.getElementById('intro-screen').style.opacity = '0';
-                    setTimeout(() => document.getElementById('intro-screen').style.display = 'none', 1000);
-                    exchangeToken(code);
-                } else {
-                    document.getElementById('setup-overlay').style.display = 'flex';
-                }
-            }, 2500);
+            setTimeout(() => {
+                document.getElementById('intro-screen').style.opacity = '0';
+                
+                setTimeout(() => {
+                    document.getElementById('intro-screen').style.display = 'none';
+                    if (code) {
+                        exchangeToken(code);
+                    } else {
+                        document.getElementById('setup-overlay').style.display = 'flex';
+                    }
+                }, 1000);
+            }, 2600);
         };
 
         function launch() {
@@ -176,14 +177,16 @@
                     accessToken = data.access_token;
                     startApp();
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e);
+                document.getElementById('setup-overlay').style.display = 'flex';
+            }
         }
 
         function startApp() {
-            config = JSON.parse(sessionStorage.getItem('dash_config')) || {};
+            config = JSON.parse(sessionStorage.getItem('dash_config')) || { controls: true, progress: true, queue: true, jam: true };
             document.getElementById('setup-overlay').style.display = 'none';
             
-            // Apply Layout Config
             if (!config.controls) document.getElementById('controls-container').style.display = 'none';
             if (!config.progress) document.getElementById('progress-container').style.display = 'none';
             
@@ -200,8 +203,10 @@
             setTimeout(() => dashboard.style.opacity = '1', 50);
 
             const jam = sessionStorage.getItem('jam_link');
-            document.getElementById('jam-display-url').innerText = jam;
-            new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
+            if (jam) {
+                document.getElementById('jam-display-url').innerText = jam;
+                new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
+            }
             
             updateLoop();
         }
@@ -214,52 +219,56 @@
         }
 
         async function fetchPlayback() {
-            const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            if (res.status === 200) {
-                const data = await res.json();
-                document.getElementById('title').innerText = data.item.name;
-                document.getElementById('artist').innerText = data.item.artists[0].name;
-                const img = document.getElementById('art');
-                if (img.src !== data.item.album.images[0].url) {
-                    img.src = data.item.album.images[0].url;
-                    img.onload = () => {
-                        const color = colorThief.getColor(img);
-                        document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-                    };
+            try {
+                const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (res.status === 200) {
+                    const data = await res.json();
+                    document.getElementById('title').innerText = data.item.name;
+                    document.getElementById('artist').innerText = data.item.artists[0].name;
+                    const img = document.getElementById('art');
+                    if (img.src !== data.item.album.images[0].url) {
+                        img.src = data.item.album.images[0].url;
+                        img.onload = () => {
+                            const color = colorThief.getColor(img);
+                            document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        };
+                    }
+                    const percent = (data.progress_ms / data.item.duration_ms) * 100;
+                    document.getElementById('progress-fill').style.width = percent + '%';
+                    document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
+                    document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
+                    document.getElementById('play-icon').innerHTML = data.is_playing ? 
+                        '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
                 }
-                const percent = (data.progress_ms / data.item.duration_ms) * 100;
-                document.getElementById('progress-fill').style.width = percent + '%';
-                document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
-                document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
-                document.getElementById('play-icon').innerHTML = data.is_playing ? 
-                    '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function fetchQueue() {
-            const res = await fetch('https://api.spotify.com/v1/me/player/queue', {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
-            if (res.status === 200) {
-                const data = await res.json();
-                const container = document.getElementById('queue-list');
-                container.innerHTML = '';
-                data.queue.slice(0, 5).forEach(track => {
-                    const div = document.createElement('div');
-                    div.className = 'queue-item flex items-center gap-4 p-3';
-                    div.onclick = () => playSpecific(track.uri);
-                    div.innerHTML = `
-                        <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
-                        <div class="overflow-hidden">
-                            <p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p>
-                            <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
-                        </div>
-                    `;
-                    container.appendChild(div);
+            try {
+                const res = await fetch('https://api.spotify.com/v1/me/player/queue', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
-            }
+                if (res.status === 200) {
+                    const data = await res.json();
+                    const container = document.getElementById('queue-list');
+                    container.innerHTML = '';
+                    data.queue.slice(0, 5).forEach(track => {
+                        const div = document.createElement('div');
+                        div.className = 'queue-item flex items-center gap-4 p-3';
+                        div.onclick = () => playSpecific(track.uri);
+                        div.innerHTML = `
+                            <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
+                            <div class="overflow-hidden">
+                                <p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p>
+                                <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (e) { console.error(e); }
         }
 
         async function control(cmd) {
