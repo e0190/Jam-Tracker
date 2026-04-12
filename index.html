@@ -13,7 +13,6 @@
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Intro Animation */
         #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
         #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
         @keyframes fadeInOut { 0% { opacity: 0; } 40% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
@@ -132,17 +131,12 @@
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
-
             setTimeout(() => {
                 document.getElementById('intro-screen').style.opacity = '0';
-                
                 setTimeout(() => {
                     document.getElementById('intro-screen').style.display = 'none';
-                    if (code) {
-                        exchangeToken(code);
-                    } else {
-                        document.getElementById('setup-overlay').style.display = 'flex';
-                    }
+                    if (code) exchangeToken(code);
+                    else document.getElementById('setup-overlay').style.display = 'flex';
                 }, 1000);
             }, 2600);
         };
@@ -150,19 +144,16 @@
         function launch() {
             const jamLink = document.getElementById('jam-input').value;
             if (!jamLink) return alert("Please paste a Jam link first!");
-            
             config = {
                 controls: document.getElementById('check-controls').checked,
                 progress: document.getElementById('check-progress').checked,
                 queue: document.getElementById('check-queue').checked,
                 jam: document.getElementById('check-jam').checked
             };
-            
             sessionStorage.setItem('jam_link', jamLink);
             sessionStorage.setItem('dash_config', JSON.stringify(config));
-            
             const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
-            window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+            window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${scope}`;
         }
 
         async function exchangeToken(code) {
@@ -177,19 +168,14 @@
                     accessToken = data.access_token;
                     startApp();
                 }
-            } catch (e) { 
-                console.error(e);
-                document.getElementById('setup-overlay').style.display = 'flex';
-            }
+            } catch (e) { document.getElementById('setup-overlay').style.display = 'flex'; }
         }
 
         function startApp() {
             config = JSON.parse(sessionStorage.getItem('dash_config')) || { controls: true, progress: true, queue: true, jam: true };
             document.getElementById('setup-overlay').style.display = 'none';
-            
             if (!config.controls) document.getElementById('controls-container').style.display = 'none';
             if (!config.progress) document.getElementById('progress-container').style.display = 'none';
-            
             if (!config.queue && !config.jam) {
                 document.getElementById('sidebar-section').style.display = 'none';
                 document.getElementById('player-section').className = 'col-span-12 flex flex-col text-center';
@@ -197,17 +183,14 @@
                 if (!config.queue) document.getElementById('queue-card').style.display = 'none';
                 if (!config.jam) document.getElementById('jam-card').style.display = 'none';
             }
-
             const dashboard = document.getElementById('main-dashboard');
             dashboard.style.display = 'grid';
             setTimeout(() => dashboard.style.opacity = '1', 50);
-
             const jam = sessionStorage.getItem('jam_link');
             if (jam) {
                 document.getElementById('jam-display-url').innerText = jam;
                 new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
             }
-            
             updateLoop();
         }
 
@@ -228,13 +211,20 @@
                     document.getElementById('title').innerText = data.item.name;
                     document.getElementById('artist').innerText = data.item.artists[0].name;
                     const img = document.getElementById('art');
-                    if (img.src !== data.item.album.images[0].url) {
-                        img.src = data.item.album.images[0].url;
-                        img.onload = () => {
-                            const color = colorThief.getColor(img);
-                            document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-                        };
+                    const newUrl = data.item.album.images[0].url;
+                    
+                    if (img.src !== newUrl) {
+                        img.crossOrigin = "Anonymous";
+                        img.src = newUrl;
+                        // Manual trigger for ColorThief since onload can be finicky with CORS
+                        img.addEventListener('load', function() {
+                            try {
+                                const color = colorThief.getColor(img);
+                                document.body.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                            } catch (e) { console.warn("Color pick failed", e); }
+                        }, { once: true });
                     }
+
                     const percent = (data.progress_ms / data.item.duration_ms) * 100;
                     document.getElementById('progress-fill').style.width = percent + '%';
                     document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
@@ -258,13 +248,7 @@
                         const div = document.createElement('div');
                         div.className = 'queue-item flex items-center gap-4 p-3';
                         div.onclick = () => playSpecific(track.uri);
-                        div.innerHTML = `
-                            <img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg">
-                            <div class="overflow-hidden">
-                                <p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p>
-                                <p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p>
-                            </div>
-                        `;
+                        div.innerHTML = `<img src="${track.album.images[2].url}" class="w-14 h-14 rounded-xl shadow-lg"><div class="overflow-hidden"><p class="bebas text-2xl truncate leading-none mb-1">${track.name}</p><p class="text-xs opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
                         container.appendChild(div);
                     });
                 }
