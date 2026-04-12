@@ -13,6 +13,11 @@
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
+        /* Intro Animation */
+        #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; transition: opacity 1s ease; }
+        #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
+        @keyframes fadeInOut { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+
         .art-container { width: 35vw; height: 35vw; max-width: 420px; max-height: 420px; flex-shrink: 0; margin: 0 auto; }
         .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; box-shadow: 0 40px 100px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); }
 
@@ -21,31 +26,58 @@
         .progress-bg { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; width: 100%; position: relative; }
         #progress-fill { height: 100%; background: white; border-radius: 10px; width: 0%; transition: width 0.5s linear; }
 
-        /* No scroll, fixed height queue */
         #queue-list { overflow: hidden; }
-
         .queue-item { cursor: pointer; transition: all 0.2s; border-radius: 15px; }
         .queue-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.02); }
         
-        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .toggle-card { background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 25px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: white; }
     </style>
 </head>
 <body>
 
+    <div id="intro-screen">
+        <div id="intro-text" class="bebas">MADE BY E19</div>
+    </div>
+
     <div id="setup-overlay">
-        <div class="glass p-12 rounded-[60px] max-w-lg w-full text-center border-2 border-white/5">
-            <h2 class="text-6xl bebas mb-8 tracking-tight italic">E19 DASHBOARD</h2>
-            <input type="text" id="jam-input" placeholder="PASTE JAM LINK" 
-                class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl mb-8 text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest">
-            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas tracking-tighter uppercase">
+        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5">
+            <h2 class="text-5xl bebas mb-8 tracking-tight italic text-center">DASHBOARD CONFIG</h2>
+            
+            <div class="space-y-4 mb-10">
+                <input type="text" id="jam-input" placeholder="PASTE JAM LINK" 
+                    class="w-full bg-white/5 border-2 border-white/10 p-5 rounded-3xl text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest mb-4">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="toggle-card">
+                        <span class="bebas text-xl">PLAY BUTTONS</span>
+                        <input type="checkbox" id="check-controls" checked>
+                    </label>
+                    <label class="toggle-card">
+                        <span class="bebas text-xl">PROGRESS BAR</span>
+                        <input type="checkbox" id="check-progress" checked>
+                    </label>
+                    <label class="toggle-card">
+                        <span class="bebas text-xl">QUEUE</span>
+                        <input type="checkbox" id="check-queue" checked>
+                    </label>
+                    <label class="toggle-card">
+                        <span class="bebas text-xl">JAM QR</span>
+                        <input type="checkbox" id="check-jam" checked>
+                    </label>
+                </div>
+            </div>
+
+            <button onclick="launch()" class="w-full bg-white text-black font-black p-5 rounded-3xl hover:bg-gray-200 transition-all text-2xl bebas tracking-tighter uppercase italic">
                 Connect & Launch
             </button>
         </div>
     </div>
 
-    <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full max-w-[1700px] px-12 items-center" style="display: none; opacity: 0;">
+    <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full max-w-[1700px] px-12 items-center" style="display: none; opacity: 0; transition: opacity 1s ease;">
         
-        <div class="col-span-7 flex flex-col text-center">
+        <div id="player-section" class="col-span-7 flex flex-col text-center">
             <div class="art-container mb-10">
                 <img id="art" src="" crossorigin="anonymous" class="album-art">
             </div>
@@ -54,13 +86,13 @@
                 <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
                 <p id="artist" class="text-2xl font-bold opacity-40 italic tracking-tight mb-6"></p>
                 
-                <div class="flex items-center gap-4 w-full max-w-2xl">
+                <div id="progress-container" class="flex items-center gap-4 w-full max-w-2xl">
                     <span id="time-cur" class="text-xs opacity-50 font-mono">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
                     <span id="time-total" class="text-xs opacity-50 font-mono">0:00</span>
                 </div>
 
-                <div class="flex items-center justify-center gap-12 mt-8">
+                <div id="controls-container" class="flex items-center justify-center gap-12 mt-8">
                     <button onclick="control('previous')" class="opacity-40 hover:opacity-100 transition-all">
                         <svg width="40" height="40" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg>
                     </button>
@@ -74,14 +106,13 @@
             </div>
         </div>
 
-        <div class="col-span-5 flex flex-col h-[85vh] gap-6">
-            <div class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
+        <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-6">
+            <div id="queue-card" class="glass rounded-[50px] p-10 flex-grow overflow-hidden flex flex-col">
                 <h2 class="bebas text-2xl opacity-20 mb-6 tracking-[0.3em] uppercase italic">Up Next</h2>
-                <div id="queue-list" class="space-y-4">
-                    </div>
+                <div id="queue-list" class="space-y-4"></div>
             </div>
 
-            <div class="glass rounded-[50px] p-6 flex items-center gap-8 border-l-8 border-white">
+            <div id="jam-card" class="glass rounded-[50px] p-6 flex items-center gap-8 border-l-8 border-white">
                 <div id="qrcode" class="bg-white p-2 rounded-2xl shadow-2xl"></div>
                 <div class="overflow-hidden">
                     <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
@@ -96,11 +127,39 @@
         const REDIRECT_URI = window.location.origin + '/';
         const colorThief = new ColorThief();
         let accessToken = null;
+        let config = {};
+
+        window.onload = () => {
+            // Wait for intro
+            setTimeout(() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const code = urlParams.get('code');
+                const jam = sessionStorage.getItem('jam_link');
+
+                if (code && jam) {
+                    document.getElementById('intro-screen').style.opacity = '0';
+                    setTimeout(() => document.getElementById('intro-screen').style.display = 'none', 1000);
+                    exchangeToken(code);
+                } else {
+                    document.getElementById('setup-overlay').style.display = 'flex';
+                }
+            }, 2500);
+        };
 
         function launch() {
             const jamLink = document.getElementById('jam-input').value;
             if (!jamLink) return alert("Please paste a Jam link first!");
+            
+            config = {
+                controls: document.getElementById('check-controls').checked,
+                progress: document.getElementById('check-progress').checked,
+                queue: document.getElementById('check-queue').checked,
+                jam: document.getElementById('check-jam').checked
+            };
+            
             sessionStorage.setItem('jam_link', jamLink);
+            sessionStorage.setItem('dash_config', JSON.stringify(config));
+            
             const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
             window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&scope=${scope}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
         }
@@ -121,25 +180,41 @@
         }
 
         function startApp() {
+            config = JSON.parse(sessionStorage.getItem('dash_config')) || {};
             document.getElementById('setup-overlay').style.display = 'none';
+            
+            // Apply Layout Config
+            if (!config.controls) document.getElementById('controls-container').style.display = 'none';
+            if (!config.progress) document.getElementById('progress-container').style.display = 'none';
+            
+            if (!config.queue && !config.jam) {
+                document.getElementById('sidebar-section').style.display = 'none';
+                document.getElementById('player-section').className = 'col-span-12 flex flex-col text-center';
+            } else {
+                if (!config.queue) document.getElementById('queue-card').style.display = 'none';
+                if (!config.jam) document.getElementById('jam-card').style.display = 'none';
+            }
+
             const dashboard = document.getElementById('main-dashboard');
             dashboard.style.display = 'grid';
             setTimeout(() => dashboard.style.opacity = '1', 50);
+
             const jam = sessionStorage.getItem('jam_link');
             document.getElementById('jam-display-url').innerText = jam;
             new QRCode(document.getElementById("qrcode"), { text: jam, width: 110, height: 110 });
+            
             updateLoop();
         }
 
         async function updateLoop() {
             if (!accessToken) return;
             await fetchPlayback();
-            await fetchQueue();
+            if (config.queue) await fetchQueue();
             setTimeout(updateLoop, 3000);
         }
 
         async function fetchPlayback() {
-            const res = await fetch('https://api.spotify.com/v1/me/player', {
+            const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             if (res.status === 200) {
@@ -171,7 +246,6 @@
                 const data = await res.json();
                 const container = document.getElementById('queue-list');
                 container.innerHTML = '';
-                // Fixed to top 5 to avoid scrolling
                 data.queue.slice(0, 5).forEach(track => {
                     const div = document.createElement('div');
                     div.className = 'queue-item flex items-center gap-4 p-3';
@@ -192,7 +266,7 @@
             let method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
             let endpoint = cmd;
             if (cmd === 'toggle') {
-                const s = await (await fetch('https://api.spotify.com/v1/me/player', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
+                const s = await (await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
                 endpoint = s.is_playing ? 'pause' : 'play';
             }
             await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
@@ -215,13 +289,6 @@
             const sec = ((ms % 60000) / 1000).toFixed(0);
             return min + ":" + (sec < 10 ? '0' : '') + sec;
         }
-
-        window.onload = () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-            const jam = sessionStorage.getItem('jam_link');
-            if (code && jam) exchangeToken(code);
-        };
     </script>
 </body>
 </html>
