@@ -56,7 +56,7 @@
 
         #player-card { width: 100%; max-width: 560px; box-sizing: border-box; padding: 22px 28px 26px; display: flex; flex-direction: column; gap: 20px; }
         .progress-bg { height: 6px; background: rgb(255 255 255 / .18); border-radius: 999px; width: 100%; overflow: hidden; }
-        #progress-fill { height: 100%; width: 0%; background: #fff; border-radius: 999px; box-shadow: 0 0 14px rgb(255 255 255 / .7); transition: width 0.5s linear; }
+        #progress-fill { height: 100%; width: 0%; background: #fff; border-radius: 999px; box-shadow: 0 0 14px rgb(255 255 255 / .7); }
 
         /* Round glass buttons for previous / next, solid white for play */
         .ctl { width: 56px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .3), rgb(255 255 255 / .1)); border: 1px solid rgb(255 255 255 / .35); box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), 0 10px 30px rgb(0 0 0 / .2); transition: transform var(--fast) var(--ease); }
@@ -676,8 +676,11 @@
             if (!provider) return;
             const current = provider;
             try {
+                const sent = performance.now();
                 const now = await provider.nowPlaying();
                 if (provider !== current) return;
+                // Spotify measured the position somewhere during the request: assume the middle
+                if (now) now.at = (sent + performance.now()) / 2;
                 if (now) showNowPlaying(now);
                 if (settings.config.queue) {
                     const items = await provider.list();
@@ -691,11 +694,12 @@
 
         function showNowPlaying(now) {
             if (now.empty) {
-                isPlaying = false;
+                setPlayingNow(false);
                 setPlayIcon();
                 if (provider === lastfm) setSongText('Nothing playing', '', null);
                 return;
             }
+            syncClock(now);
             isPlaying = !!now.isPlaying;
             setPlayIcon();
             if (!now.title) return;
@@ -704,11 +708,48 @@
                 lastArtUrl = now.art;
                 showArt(now.art);
             }
-            if (now.duration) {
-                document.getElementById('progress-fill').style.width = Math.min(100, (now.progress / now.duration) * 100) + '%';
-                document.getElementById('time-cur').innerText = formatTime(now.progress);
-            }
         }
+
+        // ---------- Progress bar: runs on its own, the 3-second checks only keep it lined up ----------
+
+        const clock = { progress: 0, duration: 0, at: 0 };
+
+        function clockNow() {
+            if (!clock.duration) return 0;
+            const ran = isPlaying ? performance.now() - clock.at : 0;
+            return Math.min(clock.duration, clock.progress + ran);
+        }
+
+        function syncClock(now) {
+            if (!now.duration) { clock.duration = 0; return; }
+            const predicted = clockNow();
+            const actual = now.progress + (now.isPlaying ? performance.now() - now.at : 0);
+            const behind = predicted - actual;
+            // Same song and only a hair ahead: keep going instead of stepping back (that looks like a stutter)
+            const sameSong = clock.duration === now.duration;
+            clock.progress = sameSong && behind > 0 && behind < 700 ? predicted : actual;
+            clock.duration = now.duration;
+            clock.at = performance.now();
+        }
+
+        // Pausing or playing from the dashboard: freeze or restart the bar right away
+        function setPlayingNow(playing) {
+            clock.progress = clockNow();
+            clock.at = performance.now();
+            isPlaying = playing;
+        }
+
+        let shownSecond = -1;
+        function tickProgress() {
+            if (clock.duration) {
+                const pos = clockNow();
+                document.getElementById('progress-fill').style.width = (pos / clock.duration * 100) + '%';
+                const second = Math.floor(pos / 1000);
+                if (second !== shownSecond) { shownSecond = second; document.getElementById('time-cur').innerText = formatTime(pos); }
+            }
+            requestAnimationFrame(tickProgress);
+        }
+        requestAnimationFrame(tickProgress);
 
         // Old title drifts out, new one drifts in. Does nothing if the song didn't change.
         let shownSong = '';
@@ -803,7 +844,7 @@
 
         async function control(cmd) {
             if (!provider || !provider.canControl) return;
-            if (cmd === 'toggle') { await provider.control(cmd); isPlaying = !isPlaying; setPlayIcon(); }
+            if (cmd === 'toggle') { await provider.control(cmd); setPlayingNow(!isPlaying); setPlayIcon(); }
             else await provider.control(cmd);
             setTimeout(updateLoop, 400);
         }
