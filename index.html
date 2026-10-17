@@ -165,6 +165,9 @@
         #setup-error { color: #ffb3b3; text-align: center; font-size: .9rem; min-height: 1.2rem; }
         .launch { width: 100%; min-height: 56px; background: #fff; color: #0b0a12; border-radius: var(--r-md); padding: 1rem; font: 700 1.05rem var(--font); letter-spacing: -.01em; box-shadow: 0 12px 30px rgb(0 0 0 / .3), inset 0 -2px 0 rgb(0 0 0 / .06); transition: transform var(--fast) var(--ease); }
         .launch:hover { transform: scale(1.01); } .launch:active { transform: scale(.98); }
+        /* Jam link on the dashboard: an editable box, so a new Jam can be pasted without leaving */
+        .jam-link-box { width: 100%; min-height: 34px; padding: 6px 10px; border-radius: 10px; background: rgb(255 255 255 / .08); border: 1px solid rgb(255 255 255 / .16); color: var(--ink-2); font-size: .75rem; outline: none; box-shadow: inset 0 1px 2px rgb(0 0 0 / .2); transition: border-color var(--fast), color var(--fast); }
+        .jam-link-box:focus { border-color: rgb(255 255 255 / .5); color: #fff; }
         #settings-btn { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 500; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .28), rgb(255 255 255 / .08)); border: 1px solid rgb(255 255 255 / .3); box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), 0 8px 24px rgb(0 0 0 / .2); opacity: 0; transform: scale(.85); pointer-events: none; transition: opacity .3s var(--ease), transform .3s var(--ease); }
         #settings-btn svg { width: 20px; height: 20px; }
         /* Hidden until the mouse comes near the top-right corner (or Tab reaches it) */
@@ -301,10 +304,10 @@
             </div>
             <div id="jam-card" class="glass p-5 flex items-center gap-5">
                 <div id="qrcode" class="bg-white p-2 shrink-0"></div>
-                <div class="overflow-hidden flex flex-col gap-1">
+                <div class="overflow-hidden flex flex-col gap-1 flex-1 min-w-0">
                     <p style="font-size:1.05rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap">Join the Jam</p>
                     <p style="font-size:.82rem;color:var(--ink-2)">Scan with your phone camera</p>
-                    <p id="jam-display-url" class="mono truncate" style="font-size:.75rem;color:var(--ink-3)"></p>
+                    <input id="jam-display-url" type="text" class="jam-link-box mono mt-1" aria-label="Jam link" placeholder="Paste a Jam link" autocomplete="off" spellcheck="false">
                 </div>
             </div>
         </div>
@@ -705,11 +708,8 @@
             document.getElementById('artist').innerText = '';
             document.getElementById('main-dashboard').style.display = 'grid';
             setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
-            document.getElementById('qrcode').innerHTML = '';
-            if (settings.jam && config.jam) {
-                document.getElementById('jam-display-url').innerText = settings.jam;
-                new QRCode(document.getElementById("qrcode"), { text: settings.jam, width: 96, height: 96 });
-            }
+            document.getElementById('jam-display-url').value = settings.jam || '';
+            drawJamQr();
             lastArtUrl = null;
             shownSong = '';
             shownList = '';
@@ -1060,6 +1060,27 @@
                 setVibe('#121212');
             }
         }
+
+        // ---------- Jam link box on the dashboard: edit it and the QR code follows ----------
+
+        function drawJamQr() {
+            const qr = document.getElementById('qrcode');
+            qr.innerHTML = '';
+            if (settings.jam) new QRCode(qr, { text: settings.jam, width: 96, height: 96 });
+        }
+
+        let jamTimer = null;
+        document.getElementById('jam-display-url').addEventListener('input', e => {
+            clearTimeout(jamTimer);
+            jamTimer = setTimeout(() => {
+                const link = e.target.value.trim();
+                if (link === settings.jam) return;
+                settings.jam = link;
+                store.set('settings', settings);
+                drawJamQr();
+            }, 400); // wait until typing or pasting pauses
+        });
+        document.getElementById('jam-display-url').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 
         // ---------- Settings button: shows when the pointer is near the top-right corner ----------
 
