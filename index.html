@@ -11,7 +11,7 @@
         body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
         .bebas { font-family: 'Bebas Neue', cursive; }
         .glass { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(50px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        
+
         #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
         #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
         @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.95); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.05); } }
@@ -24,13 +24,25 @@
         .progress-bg { height: 8px; background: rgba(255,255,255,0.1); border-radius: 20px; width: 100%; position: relative; overflow: hidden; }
         #progress-fill { height: 100%; background: white; border-radius: 20px; width: 0%; transition: width 0.5s linear; }
 
-        .queue-item { cursor: pointer; transition: all 0.3s ease; border-radius: 20px; border: 1px solid transparent; }
-        .queue-item:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.1); transform: translateX(10px); }
-        
-        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .queue-item { transition: all 0.3s ease; border-radius: 20px; border: 1px solid transparent; }
+        .queue-item.clickable { cursor: pointer; }
+        .queue-item.clickable:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.1); transform: translateX(10px); }
+
+        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 2rem 0; }
         .toggle-card { background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
         .toggle-card:has(input:checked) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
+        .toggle-card:has(input:disabled) { opacity: 0.3; }
         input[type="checkbox"] { width: 24px; height: 24px; accent-color: white; cursor: pointer; }
+        .field { width: 100%; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); padding: 1.1rem 1.5rem; border-radius: 30px; color: white; outline: none; text-align: center; font-size: 1.25rem; letter-spacing: 0.1em; transition: all 0.2s; }
+        .field:focus { border-color: white; }
+        .source-btn { padding: 1.1rem; border-radius: 30px; border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); transition: all 0.2s; }
+        .source-btn.active { background: white; color: black; border-color: white; }
+        .help { font-size: 0.8rem; opacity: 0.5; line-height: 1.5; text-align: center; }
+        .help a { text-decoration: underline; }
+        .help code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 6px; user-select: all; }
+        #setup-error { color: #ff8a8a; text-align: center; font-size: 0.9rem; min-height: 1.2rem; }
+        #settings-btn { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 500; opacity: 0.15; transition: opacity 0.2s; }
+        #settings-btn:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -40,23 +52,43 @@
     </div>
 
     <div id="setup-overlay">
-        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5 mx-4">
+        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5 mx-4 my-auto">
             <h2 class="text-5xl bebas mb-8 tracking-tight italic text-center">DASHBOARD CONFIG</h2>
-            <div class="space-y-4 mb-10">
-                <input type="text" id="jam-input" placeholder="PASTE JAM LINK" 
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button id="src-spotify" onclick="pickSource('spotify')" class="source-btn bebas text-xl tracking-widest">SPOTIFY</button>
+                <button id="src-lastfm" onclick="pickSource('lastfm')" class="source-btn bebas text-xl tracking-widest">ANY APP (LAST.FM)</button>
+            </div>
+
+            <div id="spotify-fields" class="space-y-3 mb-6">
+                <input type="text" id="client-id" placeholder="SPOTIFY CLIENT ID" class="field bebas" autocomplete="off" spellcheck="false">
+                <p class="help">Make a free app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, tick "Web API", and add this Redirect URI:<br><code id="redirect-display"></code><br>Then copy its Client ID here.</p>
+            </div>
+
+            <div id="lastfm-fields" class="space-y-3 mb-6" style="display:none">
+                <input type="text" id="lastfm-user" placeholder="LAST.FM USERNAME" class="field bebas" autocomplete="off" spellcheck="false">
+                <input type="text" id="lastfm-key" placeholder="LAST.FM API KEY" class="field bebas" autocomplete="off" spellcheck="false">
+                <p class="help">Works with Apple Music, YouTube Music, Amazon Music, Pandora, Tidal, SoundCloud and more. Connect your music app to <a href="https://www.last.fm/settings/applications" target="_blank" rel="noopener">Last.fm</a> (or use the <a href="https://web-scrobbler.com" target="_blank" rel="noopener">Web Scrobbler</a> extension), then get a free API key at <a href="https://www.last.fm/api/account/create" target="_blank" rel="noopener">last.fm/api/account/create</a>.<br>Shows what's playing only: no play buttons or queue.</p>
+            </div>
+
+            <div class="space-y-4 mb-6">
+                <input type="text" id="jam-input" placeholder="PASTE JAM LINK"
                     class="w-full bg-white/5 border-2 border-white/10 p-6 rounded-[30px] text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest mb-4">
                 <div class="grid grid-cols-2 gap-4">
                     <label class="toggle-card"><span class="bebas text-xl">PLAY BUTTONS</span><input type="checkbox" id="check-controls" checked></label>
                     <label class="toggle-card"><span class="bebas text-xl">PROGRESS BAR</span><input type="checkbox" id="check-progress" checked></label>
-                    <label class="toggle-card"><span class="bebas text-xl">QUEUE</span><input type="checkbox" id="check-queue" checked></label>
+                    <label class="toggle-card"><span class="bebas text-xl" id="queue-label">QUEUE</span><input type="checkbox" id="check-queue" checked></label>
                     <label class="toggle-card"><span class="bebas text-xl">JAM QR</span><input type="checkbox" id="check-jam" checked></label>
                 </div>
             </div>
+            <p id="setup-error" class="mb-4"></p>
             <button onclick="launch()" class="w-full bg-white text-black font-black p-6 rounded-[30px] hover:scale-[1.02] active:scale-[0.98] transition-all text-2xl bebas tracking-tighter uppercase italic">
                 Connect & Launch
             </button>
         </div>
     </div>
+
+    <button id="settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="28" height="28" fill="white" viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
 
     <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full h-full max-w-[1800px] px-16 items-center" style="display: none; opacity: 0; transition: opacity 1.5s ease;">
         <div id="player-section" class="col-span-7 flex flex-col text-center">
@@ -81,7 +113,7 @@
         </div>
         <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-8">
             <div id="queue-card" class="glass rounded-[60px] p-12 flex-grow overflow-hidden flex flex-col">
-                <h2 class="bebas text-3xl opacity-20 mb-8 tracking-[0.4em] uppercase italic text-center">Up Next</h2>
+                <h2 id="queue-title" class="bebas text-3xl opacity-20 mb-8 tracking-[0.4em] uppercase italic text-center">Up Next</h2>
                 <div id="queue-list" class="space-y-6"></div>
             </div>
             <div id="jam-card" class="glass rounded-[60px] p-8 flex items-center gap-10 border-l-[12px] border-white">
@@ -95,12 +127,19 @@
     </div>
 
     <script>
-        const CLIENT_ID = 'c43fb52c4e2c49499f2802ccd23699fb';
-        const REDIRECT_URI = window.location.origin + '/';
-        let accessToken = null;
-        let refreshToken = sessionStorage.getItem('refresh_token');
-        let tokenExpires = 0;
-        let config = {};
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+        const SPOTIFY_SCOPE = 'user-read-currently-playing user-read-playback-state user-modify-playback-state';
+        const LASTFM_BLANK_ART = '2a96cbd8b46e442fc41c2b86b821562f'; // Last.fm's grey star placeholder
+
+        // Settings are saved in this browser only. Nobody else ever sees your Client ID or API key.
+        const store = {
+            get(key) { try { return JSON.parse(localStorage.getItem('jt_' + key)); } catch (e) { return null; } },
+            set(key, value) { try { localStorage.setItem('jt_' + key, JSON.stringify(value)); } catch (e) {} },
+            remove(key) { try { localStorage.removeItem('jt_' + key); } catch (e) {} }
+        };
+
+        let settings = store.get('settings') || { source: 'spotify', clientId: '', lastfmUser: '', lastfmKey: '', jam: '', config: { controls: true, progress: true, queue: true, jam: true } };
+        let provider = null;
         let isPlaying = false;
         let lastArtUrl = null;
         let loopTimer = null;
@@ -108,138 +147,317 @@
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
+            const authError = urlParams.get('error');
             // Remove ?code= from the address bar so refreshing the page doesn't reuse a spent code
-            if (code || urlParams.get('error')) history.replaceState(null, '', window.location.pathname);
+            if (code || authError) history.replaceState(null, '', window.location.pathname);
+            fillSetup();
             setTimeout(() => {
                 document.getElementById('intro-screen').style.opacity = '0';
-                setTimeout(() => {
+                setTimeout(async () => {
                     document.getElementById('intro-screen').style.display = 'none';
-                    if (code) exchangeToken(code);
-                    else if (refreshToken) refreshAccess().then(ok => ok ? startApp() : showSetup());
-                    else showSetup();
+                    if (authError) return showSetup('Spotify sign-in was cancelled or refused.');
+                    if (code) return (await spotify.finishSignIn(code)) ? startApp() : showSetup('Spotify sign-in failed. Check your Client ID and Redirect URI.');
+                    if (settings.source === 'lastfm' && settings.lastfmUser && settings.lastfmKey) return startApp();
+                    if (settings.source === 'spotify' && store.get('sp_refresh') && await spotify.refresh()) return startApp();
+                    showSetup();
                 }, 1000);
             }, 2600);
         };
 
-        function showSetup() {
+        // ---------- Setup screen ----------
+
+        function fillSetup() {
+            document.getElementById('redirect-display').textContent = REDIRECT_URI;
+            document.getElementById('client-id').value = settings.clientId || '';
+            document.getElementById('lastfm-user').value = settings.lastfmUser || '';
+            document.getElementById('lastfm-key').value = settings.lastfmKey || '';
+            document.getElementById('jam-input').value = settings.jam || '';
+            ['controls', 'progress', 'queue', 'jam'].forEach(k => document.getElementById('check-' + k).checked = settings.config[k] !== false);
+            pickSource(settings.source || 'spotify');
+        }
+
+        function pickSource(source) {
+            settings.source = source;
+            const isSpotify = source === 'spotify';
+            document.getElementById('src-spotify').classList.toggle('active', isSpotify);
+            document.getElementById('src-lastfm').classList.toggle('active', !isSpotify);
+            document.getElementById('spotify-fields').style.display = isSpotify ? '' : 'none';
+            document.getElementById('lastfm-fields').style.display = isSpotify ? 'none' : '';
+            // Last.fm can't control playback or see song length
+            ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = !isSpotify);
+            document.getElementById('queue-label').textContent = isSpotify ? 'QUEUE' : 'RECENTLY PLAYED';
+            document.getElementById('setup-error').textContent = '';
+        }
+
+        function showSetup(error) {
+            document.getElementById('setup-error').textContent = error || '';
             document.getElementById('setup-overlay').style.display = 'flex';
         }
 
-        function launch() {
-            const jamLink = document.getElementById('jam-input').value.trim();
-            const wantsJam = document.getElementById('check-jam').checked;
-            if (wantsJam && !jamLink) return alert("Please paste a Jam link first!");
-            config = { controls: document.getElementById('check-controls').checked, progress: document.getElementById('check-progress').checked, queue: document.getElementById('check-queue').checked, jam: wantsJam };
-            sessionStorage.setItem('jam_link', jamLink);
-            sessionStorage.setItem('dash_config', JSON.stringify(config));
-            const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
-            window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${scope}`;
+        function openSettings() {
+            clearTimeout(loopTimer);
+            provider = null;
+            fillSetup();
+            showSetup();
         }
 
-        function saveTokens(data) {
-            accessToken = data.access_token;
-            tokenExpires = Date.now() + (data.expires_in || 3600) * 1000;
-            if (data.refresh_token) {
-                refreshToken = data.refresh_token;
-                sessionStorage.setItem('refresh_token', refreshToken);
+        async function launch() {
+            const val = id => document.getElementById(id).value.trim();
+            settings.clientId = val('client-id');
+            settings.lastfmUser = val('lastfm-user');
+            settings.lastfmKey = val('lastfm-key');
+            settings.jam = val('jam-input');
+            settings.config = {
+                controls: document.getElementById('check-controls').checked,
+                progress: document.getElementById('check-progress').checked,
+                queue: document.getElementById('check-queue').checked,
+                jam: document.getElementById('check-jam').checked
+            };
+            const error = msg => { document.getElementById('setup-error').textContent = msg; };
+            if (settings.config.jam && !settings.jam) return error('Paste a Jam link, or turn off Jam QR.');
+
+            if (settings.source === 'spotify') {
+                if (!/^[0-9a-f]{32}$/i.test(settings.clientId)) return error('That doesn’t look like a Spotify Client ID (32 letters and numbers).');
+                store.set('settings', settings);
+                // Same Client ID and still signed in? Skip the Spotify page.
+                if (store.get('sp_client') === settings.clientId && store.get('sp_refresh') && await spotify.refresh()) return startApp();
+                return spotify.signIn();
             }
+
+            if (!settings.lastfmUser || !/^[0-9a-f]{32}$/i.test(settings.lastfmKey)) return error('Enter your Last.fm username and 32-character API key.');
+            error('Checking Last.fm…');
+            const check = await lastfm.call('user.getrecenttracks', { limit: 1 });
+            if (!check.ok) return error(check.message);
+            store.set('settings', settings);
+            startApp();
         }
 
-        async function exchangeToken(code) {
-            try {
-                const res = await fetch('/api/token', { method: 'POST', body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }), headers: { 'Content-Type': 'application/json' } });
+        // ---------- Spotify (each person's own Client ID, PKCE: no server or secret needed) ----------
+
+        const spotify = {
+            name: 'spotify', canControl: true, hasProgress: true, listTitle: 'Up Next',
+            accessToken: null, expires: 0,
+
+            async signIn() {
+                const verifier = randomString(64);
+                const challenge = base64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+                try { sessionStorage.setItem('sp_verifier', verifier); } catch (e) {}
+                const params = new URLSearchParams({ client_id: settings.clientId, response_type: 'code', redirect_uri: REDIRECT_URI, scope: SPOTIFY_SCOPE, code_challenge_method: 'S256', code_challenge: challenge });
+                window.location.href = 'https://accounts.spotify.com/authorize?' + params;
+            },
+
+            async finishSignIn(code) {
+                let verifier = null;
+                try { verifier = sessionStorage.getItem('sp_verifier'); sessionStorage.removeItem('sp_verifier'); } catch (e) {}
+                if (!verifier || !settings.clientId) return false;
+                return this.token({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+            },
+
+            async refresh() {
+                const refreshToken = store.get('sp_refresh');
+                if (!refreshToken || store.get('sp_client') !== settings.clientId) return false;
+                const ok = await this.token({ grant_type: 'refresh_token', refresh_token: refreshToken });
+                if (!ok) store.remove('sp_refresh');
+                return ok;
+            },
+
+            async token(params) {
+                try {
+                    const res = await fetch('https://accounts.spotify.com/api/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ client_id: settings.clientId, ...params })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data.access_token) return false;
+                    this.accessToken = data.access_token;
+                    this.expires = Date.now() + (data.expires_in || 3600) * 1000;
+                    if (data.refresh_token) store.set('sp_refresh', data.refresh_token);
+                    store.set('sp_client', settings.clientId);
+                    return true;
+                } catch (e) { return false; }
+            },
+
+            // Every Spotify call goes through here: gets a new token when the old one is about to expire or gets rejected
+            async api(path, options = {}) {
+                if (Date.now() > this.expires - 60000) await this.refresh();
+                const call = () => fetch('https://api.spotify.com/v1/me/player' + path, { ...options, headers: { 'Authorization': `Bearer ${this.accessToken}` } });
+                let res = await call();
+                if (res.status === 401 && await this.refresh()) res = await call();
+                return res;
+            },
+
+            async nowPlaying() {
+                const res = await this.api('/currently-playing?additional_types=episode');
+                if (res.status === 204) return { empty: true }; // nothing playing
+                if (res.status !== 200) return null;
                 const data = await res.json();
-                if (res.ok && data.access_token) { saveTokens(data); startApp(); }
-                else showSetup();
-            } catch (e) { showSetup(); }
-        }
+                const item = data.item;
+                if (!item) return { isPlaying: data.is_playing }; // ads have no song info
+                const images = (item.album || item).images || [];
+                return { title: item.name, artist: artistName(item), art: images[0] && images[0].url, progress: data.progress_ms, duration: item.duration_ms, isPlaying: data.is_playing };
+            },
 
-        async function refreshAccess() {
-            if (!refreshToken) return false;
-            try {
-                const res = await fetch('/api/token', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }), headers: { 'Content-Type': 'application/json' } });
+            async list() {
+                const res = await this.api('/queue');
+                if (res.status !== 200) return null;
                 const data = await res.json();
-                if (res.ok && data.access_token) { saveTokens(data); return true; }
-            } catch (e) { console.error(e); }
-            sessionStorage.removeItem('refresh_token');
-            refreshToken = null;
-            return false;
-        }
+                return (data.queue || []).slice(0, 5).map((track, index) => {
+                    const images = (track.album || track).images || [];
+                    const thumb = images[images.length - 1];
+                    return { title: track.name, artist: artistName(track), art: thumb && thumb.url, onClick: () => this.skipTo(index) };
+                });
+            },
 
-        // Every Spotify call goes through here: gets a new token when the old one is about to expire or gets rejected
-        async function spotify(path, options = {}) {
-            if (Date.now() > tokenExpires - 60000) await refreshAccess();
-            const call = () => fetch('https://api.spotify.com/v1/me/player' + path, { ...options, headers: { 'Authorization': `Bearer ${accessToken}` } });
-            let res = await call();
-            if (res.status === 401 && await refreshAccess()) res = await call();
-            return res;
-        }
+            async control(cmd) {
+                const method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
+                const endpoint = cmd === 'toggle' ? (isPlaying ? 'pause' : 'play') : cmd;
+                await this.api('/' + endpoint, { method });
+            },
+
+            // Skip ahead to the clicked song. Playing its URI directly would wipe out the rest of the queue and the Jam.
+            async skipTo(index) {
+                for (let i = 0; i <= index; i++) await this.api('/next', { method: 'POST' });
+                setTimeout(updateLoop, 400);
+            }
+        };
+
+        // ---------- Last.fm (each person's own API key; any app that scrobbles) ----------
+
+        const lastfm = {
+            name: 'lastfm', canControl: false, hasProgress: false, listTitle: 'Recently Played',
+            recent: [],
+
+            async call(method, extra = {}) {
+                const params = new URLSearchParams({ method, user: settings.lastfmUser, api_key: settings.lastfmKey, format: 'json', ...extra });
+                try {
+                    const res = await fetch('https://ws.audioscrobbler.com/2.0/?' + params);
+                    const data = await res.json();
+                    if (data.error) {
+                        const messages = { 6: 'Last.fm can’t find that username.', 10: 'That Last.fm API key isn’t valid.', 26: 'That Last.fm API key was suspended.', 29: 'Too many requests to Last.fm. Wait a minute.' };
+                        return { ok: false, message: messages[data.error] || data.message || 'Last.fm error.' };
+                    }
+                    return { ok: true, data };
+                } catch (e) { return { ok: false, message: 'Can’t reach Last.fm.' }; }
+            },
+
+            art(track, size) {
+                const images = track.image || [];
+                const pick = images.find(i => i.size === size) || images[images.length - 1];
+                return pick && pick['#text'] && !pick['#text'].includes(LASTFM_BLANK_ART) ? pick['#text'] : null;
+            },
+
+            async nowPlaying() {
+                const result = await this.call('user.getrecenttracks', { limit: 6, extended: 0 });
+                if (!result.ok) return null;
+                let tracks = result.data.recenttracks.track || [];
+                if (!Array.isArray(tracks)) tracks = [tracks];
+                const current = tracks.find(t => t['@attr'] && t['@attr'].nowplaying === 'true');
+                this.recent = tracks.filter(t => t !== current).slice(0, 5);
+                if (!current) return { empty: true };
+                return { title: current.name, artist: current.artist['#text'], art: this.art(current, 'extralarge'), isPlaying: true };
+            },
+
+            async list() {
+                return this.recent.map(t => ({ title: t.name, artist: t.artist['#text'], art: this.art(t, 'medium') }));
+            }
+        };
+
+        // ---------- Dashboard ----------
 
         function startApp() {
-            config = JSON.parse(sessionStorage.getItem('dash_config')) || { controls: true, progress: true, queue: true, jam: true };
+            provider = settings.source === 'lastfm' ? lastfm : spotify;
+            const config = settings.config;
+            const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
             document.getElementById('setup-overlay').style.display = 'none';
-            if (!config.controls) document.getElementById('controls-container').style.display = 'none';
-            if (!config.progress) document.getElementById('progress-container').style.display = 'none';
-            if (!config.queue && !config.jam) {
-                document.getElementById('sidebar-section').style.display = 'none';
-                document.getElementById('player-section').className = 'col-span-12 flex flex-col text-center';
-            } else {
-                if (!config.queue) document.getElementById('queue-card').style.display = 'none';
-                if (!config.jam) document.getElementById('jam-card').style.display = 'none';
-            }
+            document.getElementById('settings-btn').style.display = '';
+            show('controls-container', config.controls && provider.canControl);
+            show('progress-container', config.progress && provider.hasProgress);
+            show('queue-card', config.queue);
+            show('jam-card', config.jam);
+            show('sidebar-section', config.queue || config.jam);
+            document.getElementById('player-section').className = (config.queue || config.jam ? 'col-span-7' : 'col-span-12') + ' flex flex-col text-center';
+            document.getElementById('queue-title').textContent = provider.listTitle;
+            document.getElementById('title').innerText = 'Waiting...';
+            document.getElementById('artist').innerText = '';
             document.getElementById('main-dashboard').style.display = 'grid';
             setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
-            const jam = sessionStorage.getItem('jam_link');
-            if (jam && config.jam) {
-                document.getElementById('jam-display-url').innerText = jam;
-                document.getElementById('qrcode').innerHTML = '';
-                new QRCode(document.getElementById("qrcode"), { text: jam, width: 130, height: 130 });
+            document.getElementById('qrcode').innerHTML = '';
+            if (settings.jam && config.jam) {
+                document.getElementById('jam-display-url').innerText = settings.jam;
+                new QRCode(document.getElementById("qrcode"), { text: settings.jam, width: 130, height: 130 });
             }
+            lastArtUrl = null;
             updateLoop();
         }
 
         // Only one loop ever runs: calling this again restarts the timer instead of starting a second loop
         async function updateLoop() {
             clearTimeout(loopTimer);
-            if (!accessToken) return;
-            await fetchPlayback();
-            if (config.queue) await fetchQueue();
-            clearTimeout(loopTimer);
-            loopTimer = setTimeout(updateLoop, 3000);
-        }
-
-        async function fetchPlayback() {
+            if (!provider) return;
+            const current = provider;
             try {
-                const res = await spotify('/currently-playing?additional_types=episode');
-                if (res.status === 204) { isPlaying = false; setPlayIcon(); return; } // nothing playing
-                if (res.status !== 200) return;
-                const data = await res.json();
-                isPlaying = data.is_playing;
-                setPlayIcon();
-                const item = data.item;
-                if (!item) return; // ads have no song info
-                document.getElementById('title').innerText = item.name;
-                document.getElementById('artist').innerText = artistName(item);
-                const images = (item.album || item).images || [];
-                const newUrl = images[0] && images[0].url;
-                if (newUrl && newUrl !== lastArtUrl) {
-                    lastArtUrl = newUrl;
-                    const img = document.getElementById('art');
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => updateVibeColors(img);
-                    img.src = newUrl;
+                const now = await provider.nowPlaying();
+                if (provider !== current) return;
+                if (now) showNowPlaying(now);
+                if (settings.config.queue) {
+                    const items = await provider.list();
+                    if (items && provider === current) showList(items);
                 }
-
-                const percent = Math.min(100, (data.progress_ms / item.duration_ms) * 100);
-                document.getElementById('progress-fill').style.width = percent + '%';
-                document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
-                document.getElementById('time-total').innerText = formatTime(item.duration_ms);
             } catch (e) { console.error(e); }
+            clearTimeout(loopTimer);
+            // Last.fm asks apps not to poll more than about once every few seconds
+            if (provider === current) loopTimer = setTimeout(updateLoop, provider === lastfm ? 5000 : 3000);
         }
 
-        function artistName(item) {
-            if (item.artists) return item.artists.map(a => a.name).join(', ');
-            return item.show ? item.show.name : '';
+        function showNowPlaying(now) {
+            if (now.empty) {
+                isPlaying = false;
+                setPlayIcon();
+                if (provider === lastfm) { document.getElementById('title').innerText = 'Nothing playing'; document.getElementById('artist').innerText = ''; }
+                return;
+            }
+            isPlaying = !!now.isPlaying;
+            setPlayIcon();
+            if (!now.title) return;
+            document.getElementById('title').innerText = now.title;
+            document.getElementById('artist').innerText = now.artist || '';
+            if (now.art && now.art !== lastArtUrl) {
+                lastArtUrl = now.art;
+                const img = document.getElementById('art');
+                img.crossOrigin = "anonymous";
+                img.onload = () => updateVibeColors(img);
+                img.src = now.art;
+            }
+            if (now.duration) {
+                document.getElementById('progress-fill').style.width = Math.min(100, (now.progress / now.duration) * 100) + '%';
+                document.getElementById('time-cur').innerText = formatTime(now.progress);
+                document.getElementById('time-total').innerText = formatTime(now.duration);
+            }
+        }
+
+        function showList(items) {
+            const container = document.getElementById('queue-list');
+            container.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'queue-item flex items-center gap-6 p-4' + (item.onClick ? ' clickable' : '');
+                if (item.onClick) div.onclick = item.onClick;
+                div.innerHTML = `<img class="w-20 h-20 rounded-2xl shadow-lg bg-white/10"><div class="overflow-hidden"><p class="bebas text-3xl truncate leading-none mb-2"></p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest"></p></div>`;
+                // textContent, not innerHTML, so names with < or & show correctly
+                if (item.art) div.querySelector('img').src = item.art;
+                const lines = div.querySelectorAll('p');
+                lines[0].textContent = item.title;
+                lines[1].textContent = item.artist;
+                container.appendChild(div);
+            });
+        }
+
+        async function control(cmd) {
+            if (!provider || !provider.canControl) return;
+            if (cmd === 'toggle') { await provider.control(cmd); isPlaying = !isPlaying; setPlayIcon(); }
+            else await provider.control(cmd);
+            setTimeout(updateLoop, 400);
         }
 
         function setPlayIcon() {
@@ -285,43 +503,20 @@
             }
         }
 
-        async function fetchQueue() {
-            try {
-                const res = await spotify('/queue');
-                if (res.status === 200) {
-                    const data = await res.json();
-                    const container = document.getElementById('queue-list');
-                    container.innerHTML = '';
-                    (data.queue || []).slice(0, 5).forEach((track, index) => {
-                        const div = document.createElement('div');
-                        div.className = 'queue-item flex items-center gap-6 p-4';
-                        div.onclick = () => playSpecific(index);
-                        div.innerHTML = `<img class="w-20 h-20 rounded-2xl shadow-lg"><div class="overflow-hidden"><p class="bebas text-3xl truncate leading-none mb-2"></p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest"></p></div>`;
-                        // textContent, not innerHTML, so names with < or & show correctly
-                        const images = (track.album || track).images || [];
-                        const thumb = images[images.length - 1];
-                        if (thumb) div.querySelector('img').src = thumb.url;
-                        const lines = div.querySelectorAll('p');
-                        lines[0].textContent = track.name;
-                        lines[1].textContent = artistName(track);
-                        container.appendChild(div);
-                    });
-                }
-            } catch (e) { console.error(e); }
+        // ---------- Helpers ----------
+
+        function artistName(item) {
+            if (item.artists) return item.artists.map(a => a.name).join(', ');
+            return item.show ? item.show.name : '';
         }
 
-        async function control(cmd) {
-            const method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
-            const endpoint = cmd === 'toggle' ? (isPlaying ? 'pause' : 'play') : cmd;
-            if (cmd === 'toggle') { isPlaying = !isPlaying; setPlayIcon(); }
-            await spotify('/' + endpoint, { method });
-            setTimeout(updateLoop, 400);
+        function randomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            return Array.from(crypto.getRandomValues(new Uint8Array(length)), b => chars[b % chars.length]).join('');
         }
 
-        // Skip ahead to the clicked song. Playing its URI directly would wipe out the rest of the queue and the Jam.
-        async function playSpecific(index) {
-            for (let i = 0; i <= index; i++) await spotify('/next', { method: 'POST' });
-            setTimeout(updateLoop, 400);
+        function base64url(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         }
 
         function formatTime(ms) {
