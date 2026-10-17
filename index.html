@@ -95,9 +95,8 @@
         .paste-row .field { text-align: left; }
         select.field { text-align: left; appearance: none; cursor: pointer; }
         select.field option { background: #111; color: #fff; }
-        .extras summary { cursor: pointer; list-style: none; text-align: center; }
-        .extras summary::after { content: ' ▾'; }
-        .extras[open] summary::after { content: ' ▴'; }
+        .ghost-btn { border: 1px solid var(--line-strong); border-radius: 999px; padding: .55rem 1.2rem; font: 700 .85rem 'Bricolage Grotesque'; color: var(--ink-2); transition: all var(--fast) var(--ease); }
+        .ghost-btn:hover { color: #fff; background: var(--surface-hover); }
         #setup-error { color: #ff9c9c; text-align: center; font-size: .9rem; min-height: 1.2rem; }
         .launch { width: 100%; background: #fff; color: #000; border-radius: var(--r-md); padding: 1.1rem; font: 800 1.05rem 'Bricolage Grotesque'; letter-spacing: .02em; transition: transform var(--fast) var(--ease); }
         .launch:hover { transform: scale(1.01); } .launch:active { transform: scale(.98); }
@@ -114,7 +113,10 @@
 
     <div id="setup-overlay">
         <div class="glass p-10 max-w-xl w-full mx-4 my-auto">
-            <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em">Set up</h2>
+            <!-- First time (and Settings): pick a service and connect it -->
+            <div id="view-setup">
+            <button id="back-btn" class="ghost-btn mb-4" onclick="settings = store.get('settings') || settings; showStart()" style="display:none">← Back</button>
+            <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em" id="setup-title">Set up</h2>
             <p class="help mb-6">Takes about 2 minutes. You only do this once.</p>
 
             <p class="label mb-3" style="color:var(--ink-2)">What do you listen on?</p>
@@ -177,9 +179,15 @@
                 </li>
             </ol>
 
-            <details class="extras mb-5">
-                <summary class="label" style="color:var(--ink-2)">Extras (optional)</summary>
-                <div class="space-y-3 mt-4">
+            <p id="setup-error" class="mb-4"></p>
+            <button onclick="connect()" class="launch" id="launch-btn">Connect</button>
+            </div>
+
+            <!-- Every time after that: just the Jam link and what to show -->
+            <div id="view-start" style="display:none">
+                <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em">Ready</h2>
+                <p class="help mb-6" id="connected-as"></p>
+                <div class="space-y-3 mb-5">
                     <p class="step-text">Hosting a Spotify Jam? Paste its invite link and friends can scan a QR code to join.</p>
                     <input type="text" id="jam-input" placeholder="Jam link" class="field" autocomplete="off" spellcheck="false">
                     <div class="grid grid-cols-2 gap-3">
@@ -189,9 +197,9 @@
                         <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Jam QR</span><input type="checkbox" id="check-jam" checked></label>
                     </div>
                 </div>
-            </details>
-            <p id="setup-error" class="mb-4"></p>
-            <button onclick="launch()" class="launch" id="launch-btn">Start</button>
+                <button onclick="start()" class="launch">Start</button>
+                <button onclick="showSetupView()" class="ghost-btn mt-4 mx-auto block">Settings</button>
+            </div>
         </div>
     </div>
 
@@ -243,6 +251,11 @@
         };
 
         let settings = store.get('settings') || { source: 'spotify', clientId: '', lastfmUser: '', lastfmKey: '', jam: '', config: { controls: true, progress: true, queue: true, jam: true } };
+        // People who set up before the quick screen existed: count them as connected
+        if (!settings.connected) {
+            if (settings.source === 'lastfm' && settings.lastfmUser && settings.lastfmKey) settings.connected = 'lastfm';
+            else if (settings.source === 'spotify' && store.get('sp_refresh')) settings.connected = 'spotify';
+        }
         let provider = null;
         let isPlaying = false;
         let lastArtUrl = null;
@@ -260,9 +273,9 @@
                 setTimeout(async () => {
                     document.getElementById('intro-screen').style.display = 'none';
                     if (authError) return showSetup('Spotify sign-in was cancelled or refused.');
-                    if (code) return (await spotify.finishSignIn(code)) ? startApp() : showSetup('Spotify sign-in failed. Check your Client ID and Redirect URI.');
-                    if (settings.source === 'lastfm' && settings.lastfmUser && settings.lastfmKey) return startApp();
-                    if (settings.source === 'spotify' && store.get('sp_refresh') && await spotify.refresh()) return startApp();
+                    if (code) return (await spotify.finishSignIn(code)) ? connected() : showSetup('Spotify sign-in failed. Check your Client ID and Redirect URI.');
+                    if (settings.connected === 'lastfm' && settings.lastfmUser && settings.lastfmKey) return showStart();
+                    if (settings.connected === 'spotify' && store.get('sp_refresh') && await spotify.refresh()) return showStart();
                     showSetup();
                 }, 1000);
             }, 2600);
@@ -288,10 +301,7 @@
             document.getElementById('src-lastfm').classList.toggle('active', !isSpotify);
             document.getElementById('spotify-fields').style.display = isSpotify ? '' : 'none';
             document.getElementById('lastfm-fields').style.display = isSpotify ? 'none' : '';
-            // Last.fm can't control playback or see song length
-            ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = !isSpotify);
-            document.getElementById('queue-label').textContent = isSpotify ? 'QUEUE' : 'RECENTLY PLAYED';
-            document.getElementById('launch-btn').textContent = isSpotify ? 'Connect Spotify' : 'Start';
+            document.getElementById('launch-btn').textContent = isSpotify ? 'Connect Spotify' : 'Connect Last.fm';
             document.getElementById('setup-error').textContent = '';
         }
 
@@ -394,37 +404,59 @@
         watchField('client-id', /^[0-9a-f]{32}$/i, '#spotify-fields li:last-child');
         watchField('lastfm-key', /^[0-9a-f]{32}$/i, '#lastfm-fields li:last-child');
 
-        function showSetup(error) {
-            document.getElementById('setup-error').textContent = error || '';
+        function showOverlay(view) {
+            document.getElementById('view-setup').style.display = view === 'setup' ? '' : 'none';
+            document.getElementById('view-start').style.display = view === 'start' ? '' : 'none';
             document.getElementById('setup-overlay').style.display = 'flex';
+            document.getElementById('setup-overlay').scrollTop = 0;
+        }
+
+        // The full setup: first visit, or "Settings" later
+        function showSetup(error) {
+            fillSetup();
+            const isSettings = !!settings.connected;
+            document.getElementById('back-btn').style.display = isSettings ? '' : 'none';
+            document.getElementById('setup-title').textContent = isSettings ? 'Settings' : 'Set up';
+            document.getElementById('setup-error').textContent = error || '';
+            showOverlay('setup');
+        }
+
+        function showSetupView() { showSetup(); }
+
+        // The quick screen people see every time once they're set up
+        function showStart() {
+            fillSetup();
+            const lf = settings.connected === 'lastfm';
+            document.getElementById('connected-as').textContent = lf ? `Connected to Last.fm as ${settings.lastfmUser}` : 'Connected to Spotify';
+            ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = lf);
+            document.getElementById('queue-label').textContent = lf ? 'RECENTLY PLAYED' : 'QUEUE';
+            showOverlay('start');
         }
 
         function openSettings() {
             clearTimeout(loopTimer);
             provider = null;
-            fillSetup();
-            showSetup();
+            showStart();
         }
 
-        async function launch() {
+        function connected() {
+            settings.connected = settings.source;
+            store.set('settings', settings);
+            showStart();
+        }
+
+        async function connect() {
             const val = id => document.getElementById(id).value.trim();
             settings.clientId = val('client-id');
             settings.lastfmUser = val('lastfm-user');
             settings.lastfmKey = val('lastfm-key');
-            settings.jam = val('jam-input');
-            settings.config = {
-                controls: document.getElementById('check-controls').checked,
-                progress: document.getElementById('check-progress').checked,
-                queue: document.getElementById('check-queue').checked,
-                jam: document.getElementById('check-jam').checked
-            };
             const error = msg => { document.getElementById('setup-error').textContent = msg; };
 
             if (settings.source === 'spotify') {
                 if (!/^[0-9a-f]{32}$/i.test(settings.clientId)) return error('That doesn’t look like a Spotify Client ID (32 letters and numbers).');
                 store.set('settings', settings);
                 // Same Client ID and still signed in? Skip the Spotify page.
-                if (store.get('sp_client') === settings.clientId && store.get('sp_refresh') && await spotify.refresh()) return startApp();
+                if (store.get('sp_client') === settings.clientId && store.get('sp_refresh') && await spotify.refresh()) return connected();
                 return spotify.signIn();
             }
 
@@ -432,6 +464,18 @@
             error('Checking Last.fm…');
             const check = await lastfm.call('user.getrecenttracks', { limit: 1 });
             if (!check.ok) return error(check.message);
+            connected();
+        }
+
+        function start() {
+            settings.jam = document.getElementById('jam-input').value.trim();
+            settings.config = {
+                controls: document.getElementById('check-controls').checked,
+                progress: document.getElementById('check-progress').checked,
+                queue: document.getElementById('check-queue').checked,
+                jam: document.getElementById('check-jam').checked
+            };
+            settings.source = settings.connected;
             store.set('settings', settings);
             startApp();
         }
@@ -570,7 +614,7 @@
         // ---------- Dashboard ----------
 
         function startApp() {
-            provider = settings.source === 'lastfm' ? lastfm : spotify;
+            provider = settings.connected === 'lastfm' ? lastfm : spotify;
             const config = { ...settings.config, jam: settings.config.jam && !!settings.jam }; // no Jam link = no QR card
             const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
             document.getElementById('setup-overlay').style.display = 'none';
