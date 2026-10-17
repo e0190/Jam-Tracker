@@ -6,102 +6,125 @@
     <title>Jam Tracker - E19</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
             --vibe: #1e1e24;
-            --ink: #fff; --ink-2: rgb(255 255 255 / .7); --ink-3: rgb(255 255 255 / .45);
-            --surface: rgb(0 0 0 / .32); --surface-hover: rgb(255 255 255 / .08);
-            --line: rgb(255 255 255 / .10); --line-strong: rgb(255 255 255 / .28);
+            --ink: #fff; --ink-2: rgb(255 255 255 / .75); --ink-3: rgb(255 255 255 / .6);
+            --surface-hover: rgb(255 255 255 / .12);
+            --line: rgb(255 255 255 / .16); --line-strong: rgb(255 255 255 / .45);
             --void: #08080A;
-            --r-sm: 12px; --r-md: 20px; --r-lg: 32px;
-            --ease: cubic-bezier(.2,.7,.2,1); --fast: 180ms;
+            --r-sm: 16px; --r-md: 22px; --r-lg: 44px;
+            --ease: cubic-bezier(.2,.7,.2,1); --fast: 200ms;
+            --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Figtree', sans-serif;
+            /* Liquid glass: a bright edge on top, a soft sheen down the face, a deep shadow under */
+            --glass-fill: linear-gradient(160deg, rgb(255 255 255 / .22) 0%, rgb(255 255 255 / .07) 45%, rgb(255 255 255 / .12) 100%);
+            --glass-edge: inset 0 1px 0 rgb(255 255 255 / .55), inset 0 -1px 0 rgb(255 255 255 / .08);
         }
         html, body { height: 100%; }
-        body { margin: 0; color: var(--ink); font-family: 'Bricolage Grotesque', sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0b0b0e; }
+        body { margin: 0; color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #050507; }
+
+        /* Squircles: Apple's smooth corners where the browser supports them, normal rounding elsewhere */
+        .glass, .album-art, .thumb, .queue-item, .field, .launch, .steps li, .group, #qrcode, .badge, .source-btn { corner-shape: squircle; }
 
         /* Each song gets its own background layer; switching only fades opacity (GPU, no repaint) */
         #bg { position: fixed; inset: 0; z-index: -1; }
         .bg-layer, .glow-layer { opacity: 0; transition: opacity 1.8s var(--ease); will-change: opacity; }
         .bg-layer { position: absolute; inset: 0; }
         .bg-layer.in, .glow-layer.in { opacity: 1; }
-        body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .035; transform: translateZ(0);
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 
-        .display { font-family: 'Syne', sans-serif; font-weight: 800; }
+        .display { font-family: var(--font); font-weight: 800; letter-spacing: -.035em; }
         .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
-        .label { font-size: .75rem; letter-spacing: .28em; text-transform: uppercase; font-weight: 700; color: var(--ink-3); }
-        .glass { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 30px 80px rgb(0 0 0 / .35); }
+        .label { font-size: .82rem; font-weight: 600; color: var(--ink-2); }
+        /* No backdrop blur on the dashboard: re-blurring while the background fades is what made it lag.
+           The glass look comes from the sheen, the edge light and the shadow instead. */
+        .glass { background: var(--glass-fill); border: 1px solid rgb(255 255 255 / .28); border-radius: var(--r-lg); box-shadow: var(--glass-edge), 0 24px 60px rgb(0 0 0 / .28); }
 
         #intro-screen { position: fixed; inset: 0; background: var(--void); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
-        #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
+        #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.4em; }
         @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.95); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.05); } }
 
-        .art-container { width: 32vw; height: 32vw; max-width: 440px; max-height: 440px; flex-shrink: 0; margin: 0 auto; position: relative; }
-        .album-art { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-md); border: 1px solid rgb(255 255 255 / .12); box-shadow: 0 30px 80px rgb(0 0 0 / .45);
+        .art-container { width: 30vw; height: 30vw; max-width: 420px; max-height: 420px; flex-shrink: 0; margin: 0 auto; position: relative; }
+        .album-art { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-lg); border: 1px solid rgb(255 255 255 / .3); box-shadow: inset 0 1px 0 rgb(255 255 255 / .5), 0 40px 90px rgb(0 0 0 / .45);
             opacity: 0; transform: scale(.97); transition: opacity .8s var(--ease), transform .8s var(--ease); will-change: opacity, transform; }
         .album-art.in { opacity: 1; transform: none; }
-        .glow-layer { position: absolute; inset: -24px; filter: blur(90px); border-radius: 50%; z-index: 1; }
+        .glow-layer { position: absolute; inset: -30px; filter: blur(70px); border-radius: 50%; z-index: 1; }
 
-        .title-text { font-size: clamp(1.75rem, 4.2vw, 5rem); line-height: .95; letter-spacing: -.03em; overflow-wrap: normal; text-wrap: balance; width: 100%; }
+        .title-text { font-size: clamp(1.75rem, 4.4vw, 4rem); line-height: 1; letter-spacing: -.035em; overflow-wrap: normal; text-wrap: balance; width: 100%; }
         #title, #artist, #time-total { transition: opacity .32s var(--ease), transform .32s var(--ease); }
         .swap-out { opacity: 0; transform: translateY(10px); }
-        .progress-bg { height: 6px; background: var(--line); border-radius: 999px; width: 100%; overflow: hidden; }
-        #progress-fill { height: 100%; width: 0%; background: #fff; border-radius: 999px; box-shadow: 0 0 12px rgb(255 255 255 / .5); transition: width 0.5s linear; }
 
-        .ctl { opacity: .55; transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease); }
-        .ctl:hover { opacity: 1; transform: scale(1.04); }
-        .play { background: #fff; border-radius: 999px; padding: 1.5rem; box-shadow: 0 16px 40px rgb(0 0 0 / .35); transition: transform var(--fast) var(--ease); }
-        .play:hover { transform: scale(1.04); } .play:active { transform: scale(.96); }
-        button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--line-strong); outline-offset: 3px; }
+        #player-card { width: 100%; max-width: 560px; box-sizing: border-box; padding: 22px 28px 26px; display: flex; flex-direction: column; gap: 20px; }
+        .progress-bg { height: 6px; background: rgb(255 255 255 / .18); border-radius: 999px; width: 100%; overflow: hidden; }
+        #progress-fill { height: 100%; width: 0%; background: #fff; border-radius: 999px; box-shadow: 0 0 14px rgb(255 255 255 / .7); transition: width 0.5s linear; }
 
-        .queue-item { display: flex; align-items: center; gap: 1rem; padding: .75rem; border-radius: var(--r-md); border: 1px solid transparent; transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease), transform var(--fast) var(--ease); }
+        /* Round glass buttons for previous / next, solid white for play */
+        .ctl { width: 56px; height: 56px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .3), rgb(255 255 255 / .1)); border: 1px solid rgb(255 255 255 / .35); box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), 0 10px 30px rgb(0 0 0 / .2); transition: transform var(--fast) var(--ease); }
+        .ctl svg { width: 22px; height: 22px; }
+        .ctl:hover { transform: scale(1.06); } .ctl:active { transform: scale(.94); }
+        .play { width: 76px; height: 76px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 999px; box-shadow: 0 14px 36px rgb(0 0 0 / .3), inset 0 -2px 0 rgb(0 0 0 / .06); transition: transform var(--fast) var(--ease); }
+        .play svg { width: 30px; height: 30px; fill: #111; }
+        .play:hover { transform: scale(1.05); } .play:active { transform: scale(.95); }
+        button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid rgb(255 255 255 / .8); outline-offset: 3px; }
+
+        .queue-item { display: flex; align-items: center; gap: 14px; padding: 10px; border-radius: var(--r-md); border: 1px solid transparent; transition: background var(--fast) var(--ease), transform var(--fast) var(--ease); }
         .queue-item.clickable { cursor: pointer; }
-        .queue-item.clickable:hover { background: var(--surface-hover); border-color: var(--line); transform: translateX(6px); }
+        .queue-item.clickable:hover { background: var(--surface-hover); transform: translateX(4px); }
         .q-enter { animation: qIn .5s var(--ease) both; }
         @keyframes qIn { from { opacity: 0; transform: translateY(12px); } }
-        .thumb { width: 64px; height: 64px; flex-shrink: 0; border-radius: var(--r-sm); object-fit: cover; background: rgb(255 255 255 / .08); box-shadow: 0 8px 24px rgb(0 0 0 / .25); }
+        .thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: var(--r-sm); object-fit: cover; background: rgb(255 255 255 / .1); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), 0 6px 16px rgb(0 0 0 / .25); }
+        #qrcode { border-radius: var(--r-md) !important; }
 
-        #jam-card { border-left: 3px solid var(--vibe); transition: border-color 1.8s var(--ease); }
-
-        #setup-overlay { position: fixed; inset: 0; background: var(--void); z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 2rem 0; }
-        .field { width: 100%; background: rgb(255 255 255 / .05); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1.1rem 1.25rem; color: #fff; text-align: center; font: 600 1rem 'Bricolage Grotesque'; letter-spacing: .08em; outline: none; transition: border-color var(--fast); }
+        /* Setup and Ready screens: still, so real frosted glass is fine here */
+        #setup-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 2rem 0;
+            background: radial-gradient(40vw 40vw at 15% 0%, rgb(123 92 255 / .55), transparent 70%), radial-gradient(36vw 36vw at 90% 100%, rgb(255 92 138 / .45), transparent 70%), radial-gradient(110% 80% at 50% 0%, #2a2340 0%, #0b0a12 65%, #050507 100%); }
+        #setup-overlay > .glass { backdrop-filter: blur(40px) saturate(180%); -webkit-backdrop-filter: blur(40px) saturate(180%); box-shadow: var(--glass-edge), 0 30px 80px rgb(0 0 0 / .4); }
+        .field { width: 100%; box-sizing: border-box; min-height: 52px; background: rgb(255 255 255 / .08); border: 1px solid var(--line); border-radius: var(--r-md); padding: .9rem 1.1rem; color: #fff; text-align: left; font: 500 .95rem var(--font); outline: none; box-shadow: inset 0 1px 2px rgb(0 0 0 / .2); transition: border-color var(--fast); }
         .field:focus { border-color: var(--line-strong); }
-        .field::placeholder { color: var(--ink-3); }
-        .source-btn { padding: 1rem; border-radius: var(--r-md); border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--ink-2); font: 700 .8rem 'Bricolage Grotesque'; letter-spacing: .2em; text-transform: uppercase; transition: all var(--fast) var(--ease); }
-        .source-btn:hover { border-color: var(--line-strong); }
-        .source-btn.active { background: #fff; color: #000; border-color: #fff; }
-        .toggle-card { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-radius: var(--r-md); background: rgb(255 255 255 / .04); border: 1px solid var(--line); transition: all var(--fast) var(--ease); cursor: pointer; }
-        .toggle-card:has(input:checked) { background: rgb(255 255 255 / .09); border-color: var(--line-strong); }
-        .toggle-card:has(input:disabled) { opacity: .3; cursor: default; }
-        input[type="checkbox"] { width: 20px; height: 20px; accent-color: #fff; cursor: pointer; }
-        .help { font-size: .8rem; color: var(--ink-3); line-height: 1.6; text-align: center; }
+        .field::placeholder { color: rgb(255 255 255 / .55); }
+        /* Spotify / Something else: an iOS segmented control */
+        .source-btn { min-height: 44px; padding: .7rem; border-radius: var(--r-md); border: 1px solid transparent; background: transparent; color: var(--ink-2); font: 600 .95rem var(--font); transition: all var(--fast) var(--ease); }
+        .source-btn.active { background: rgb(255 255 255 / .9); color: #0b0a12; box-shadow: 0 4px 14px rgb(0 0 0 / .25); }
+        .segmented { padding: 4px; border-radius: 26px; corner-shape: squircle; background: rgb(255 255 255 / .1); border: 1px solid var(--line); }
+        /* Options: an iOS grouped list with switches */
+        .group { border-radius: var(--r-md); background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .14); display: flex; flex-direction: column; }
+        .group label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; min-height: 52px; font-size: .95rem; font-weight: 500; cursor: pointer; }
+        .group label + label { border-top: 1px solid rgb(255 255 255 / .12); }
+        .group label:has(input:disabled) { opacity: .4; cursor: default; }
+        .switch { appearance: none; -webkit-appearance: none; width: 51px; height: 31px; border-radius: 999px; background: rgb(255 255 255 / .2); position: relative; cursor: pointer; margin: 0; flex-shrink: 0; transition: background .25s; }
+        .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 999px; background: #fff; box-shadow: 0 3px 8px rgb(0 0 0 / .25); transition: transform .25s var(--ease); }
+        .switch:checked { background: #34c759; }
+        .switch:checked::after { transform: translateX(20px); }
+        .switch:disabled { cursor: default; }
+        .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: var(--r-md); background: rgb(52 199 89 / .18); border: 1px solid rgb(52 199 89 / .4); font-size: .82rem; font-weight: 600; color: #d3f9dc; }
+        .badge::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: #34c759; box-shadow: 0 0 8px #34c759; }
+        .help { font-size: .85rem; color: var(--ink-3); line-height: 1.6; text-align: center; }
         .help a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
-        .help code { font-family: 'JetBrains Mono', monospace; background: rgb(255 255 255 / .08); padding: .1rem .4rem; border-radius: 6px; user-select: all; color: var(--ink-2); }
-        .steps { counter-reset: step; display: flex; flex-direction: column; gap: 1rem; }
-        .steps li { counter-increment: step; position: relative; padding: 1.1rem 1.1rem 1.1rem 3.4rem; border-radius: var(--r-md); background: rgb(255 255 255 / .04); border: 1px solid var(--line); display: flex; flex-direction: column; gap: .6rem; }
-        .steps li::before { content: counter(step); position: absolute; left: 1.1rem; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 999px; background: #fff; color: #000; font: 800 .85rem 'Bricolage Grotesque'; display: flex; align-items: center; justify-content: center; }
-        .steps li.done::before { content: '✓'; }
-        .step-title { font-weight: 800; font-size: 1.05rem; }
+        .help code { font-family: 'JetBrains Mono', monospace; background: rgb(255 255 255 / .1); padding: .1rem .4rem; border-radius: 6px; user-select: all; color: var(--ink-2); }
+        .steps { counter-reset: step; display: flex; flex-direction: column; gap: 12px; }
+        .steps li { counter-increment: step; position: relative; padding: 1.1rem 1.1rem 1.1rem 3.4rem; border-radius: var(--r-md); background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .14); display: flex; flex-direction: column; gap: .6rem; }
+        .steps li::before { content: counter(step); position: absolute; left: 1.1rem; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 999px; background: #fff; color: #0b0a12; font: 700 .85rem var(--font); display: flex; align-items: center; justify-content: center; }
+        .steps li.done::before { content: '✓'; background: #34c759; color: #fff; }
+        .step-title { font-weight: 700; font-size: 1.02rem; letter-spacing: -.01em; }
         .step-text { font-size: .9rem; color: var(--ink-2); line-height: 1.5; }
-        .step-text b { color: #fff; }
-        .step-btn { align-self: flex-start; background: #fff; color: #000; border-radius: 999px; padding: .6rem 1.1rem; font: 700 .9rem 'Bricolage Grotesque'; transition: transform var(--fast) var(--ease); }
+        .step-text b { color: #fff; font-weight: 600; }
+        .step-btn { align-self: flex-start; min-height: 40px; background: #fff; color: #0b0a12; border-radius: 999px; padding: .55rem 1.1rem; font: 600 .9rem var(--font); box-shadow: 0 6px 18px rgb(0 0 0 / .25); transition: transform var(--fast) var(--ease); }
         .step-btn:hover { transform: scale(1.03); }
         .fill-row { display: grid; grid-template-columns: 7.5rem 1fr auto; align-items: center; gap: .6rem; font-size: .85rem; color: var(--ink-3); }
-        .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .08); padding: .35rem .55rem; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .copy { border: 1px solid var(--line-strong); border-radius: 999px; padding: .35rem .8rem; font: 700 .78rem 'Bricolage Grotesque'; color: #fff; transition: background var(--fast); min-width: 4.2rem; }
+        .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); padding: .35rem .55rem; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .copy { min-height: 32px; border: 1px solid var(--line-strong); border-radius: 999px; padding: .35rem .8rem; font: 600 .8rem var(--font); color: #fff; background: rgb(255 255 255 / .06); transition: background var(--fast); min-width: 4.2rem; }
         .copy:hover { background: var(--surface-hover); }
         .paste-row { display: flex; gap: .5rem; align-items: center; }
-        .paste-row .field { text-align: left; }
-        select.field { text-align: left; appearance: none; cursor: pointer; }
-        select.field option { background: #111; color: #fff; }
-        .ghost-btn { border: 1px solid var(--line-strong); border-radius: 999px; padding: .55rem 1.2rem; font: 700 .85rem 'Bricolage Grotesque'; color: var(--ink-2); transition: all var(--fast) var(--ease); }
+        select.field { appearance: none; cursor: pointer; }
+        select.field option { background: #1a1726; color: #fff; }
+        .ghost-btn { min-height: 44px; border: none; border-radius: 999px; padding: 0 1.1rem; font: 600 .95rem var(--font); color: var(--ink-2); background: transparent; transition: all var(--fast) var(--ease); }
         .ghost-btn:hover { color: #fff; background: var(--surface-hover); }
-        #setup-error { color: #ff9c9c; text-align: center; font-size: .9rem; min-height: 1.2rem; }
-        .launch { width: 100%; background: #fff; color: #000; border-radius: var(--r-md); padding: 1.1rem; font: 800 1.05rem 'Bricolage Grotesque'; letter-spacing: .02em; transition: transform var(--fast) var(--ease); }
+        #setup-error { color: #ffb3b3; text-align: center; font-size: .9rem; min-height: 1.2rem; }
+        .launch { width: 100%; min-height: 56px; background: #fff; color: #0b0a12; border-radius: var(--r-md); padding: 1rem; font: 700 1.05rem var(--font); letter-spacing: -.01em; box-shadow: 0 12px 30px rgb(0 0 0 / .3), inset 0 -2px 0 rgb(0 0 0 / .06); transition: transform var(--fast) var(--ease); }
         .launch:hover { transform: scale(1.01); } .launch:active { transform: scale(.98); }
-        #settings-btn { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 500; opacity: 0.15; transition: opacity var(--fast); }
-        #settings-btn:hover { opacity: 0.8; }
+        #settings-btn { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 500; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .28), rgb(255 255 255 / .08)); border: 1px solid rgb(255 255 255 / .3); box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), 0 8px 24px rgb(0 0 0 / .2); opacity: .55; transition: opacity var(--fast); }
+        #settings-btn svg { width: 20px; height: 20px; }
+        #settings-btn:hover { opacity: 1; }
     </style>
 </head>
 <body>
@@ -112,15 +135,15 @@
     </div>
 
     <div id="setup-overlay">
-        <div class="glass p-10 max-w-xl w-full mx-4 my-auto">
+        <div class="glass p-8 sm:p-10 max-w-xl w-full mx-4 my-auto">
             <!-- First time (and Settings): pick a service and connect it -->
             <div id="view-setup">
             <button id="back-btn" class="ghost-btn mb-4" onclick="settings = store.get('settings') || settings; showStart()" style="display:none">← Back</button>
-            <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em" id="setup-title">Set up</h2>
+            <h2 class="display text-4xl mb-2 text-center" id="setup-title">Set up</h2>
             <p class="help mb-6">Takes about 2 minutes. You only do this once.</p>
 
-            <p class="label mb-3" style="color:var(--ink-2)">What do you listen on?</p>
-            <div class="grid grid-cols-2 gap-3 mb-6">
+            <p class="label mb-3 text-center">What do you listen on?</p>
+            <div class="segmented grid grid-cols-2 gap-1 mb-6">
                 <button id="src-spotify" onclick="pickSource('spotify')" class="source-btn">Spotify</button>
                 <button id="src-lastfm" onclick="pickSource('lastfm')" class="source-btn">Something else</button>
             </div>
@@ -185,54 +208,58 @@
 
             <!-- Every time after that: just the Jam link and what to show -->
             <div id="view-start" style="display:none">
-                <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em">Ready</h2>
-                <p class="help mb-6" id="connected-as"></p>
+                <h2 class="display text-4xl mb-3 text-center">Ready</h2>
+                <p class="text-center mb-6"><span class="badge" id="connected-as"></span></p>
                 <div class="space-y-3 mb-5">
-                    <p class="step-text">Hosting a Spotify Jam? Paste its invite link and friends can scan a QR code to join.</p>
-                    <input type="text" id="jam-input" placeholder="Jam link" class="field" autocomplete="off" spellcheck="false">
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Play Buttons</span><input type="checkbox" id="check-controls" checked></label>
-                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Progress Bar</span><input type="checkbox" id="check-progress" checked></label>
-                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)" id="queue-label">QUEUE</span><input type="checkbox" id="check-queue" checked></label>
-                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Jam QR</span><input type="checkbox" id="check-jam" checked></label>
+                    <label for="jam-input" class="block" style="font-size:.95rem;font-weight:600">Jam link <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+                    <input type="text" id="jam-input" placeholder="Paste your Spotify Jam invite link" class="field" autocomplete="off" spellcheck="false">
+                    <p class="step-text" style="font-size:.82rem">Friends scan a QR code on the screen to join.</p>
+                    <div class="group mt-2">
+                        <label>Play buttons<input type="checkbox" class="switch" id="check-controls" checked></label>
+                        <label>Progress bar<input type="checkbox" class="switch" id="check-progress" checked></label>
+                        <label><span id="queue-label">Up Next queue</span><input type="checkbox" class="switch" id="check-queue" checked></label>
+                        <label>Jam QR code<input type="checkbox" class="switch" id="check-jam" checked></label>
                     </div>
                 </div>
                 <button onclick="start()" class="launch">Start</button>
-                <button onclick="showSetupView()" class="ghost-btn mt-4 mx-auto block">Settings</button>
+                <button onclick="showSetupView()" class="ghost-btn mt-3 mx-auto flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
             </div>
         </div>
     </div>
 
-    <button id="settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="28" height="28" fill="white" viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.880l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.030 7.030 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
+    <button id="settings-btn" onclick="openSettings()" title="Settings" aria-label="Settings" style="display:none"><svg width="28" height="28" fill="white" viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.880l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.030 7.030 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
 
     <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full h-full max-w-[1800px] px-16 items-center" style="display: none; opacity: 0; transition: opacity 1.5s ease;">
         <div id="player-section" class="col-span-7 flex flex-col text-center">
             <div class="art-container mb-10" id="art-box"></div>
             <div class="flex flex-col gap-2 px-10 items-center">
                 <h1 id="title" class="display title-text">Waiting...</h1>
-                <p id="artist" class="text-2xl font-semibold mb-8" style="color:var(--ink-2)"></p>
-                <div id="progress-container" class="flex items-center gap-5 w-full max-w-3xl">
-                    <span id="time-cur" class="mono text-sm" style="color:var(--ink-3)">0:00</span>
+                <p id="artist" class="text-2xl font-medium mb-8" style="color:var(--ink-2);letter-spacing:-.01em"></p>
+                <div id="player-card" class="glass">
+                <div id="progress-container" class="flex items-center gap-4 w-full">
+                    <span id="time-cur" class="mono text-sm" style="color:var(--ink-2)">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
-                    <span id="time-total" class="mono text-sm" style="color:var(--ink-3)">0:00</span>
+                    <span id="time-total" class="mono text-sm" style="color:var(--ink-2)">0:00</span>
                 </div>
-                <div id="controls-container" class="flex items-center justify-center gap-14 mt-10">
+                <div id="controls-container" class="flex items-center justify-center gap-9">
                     <button onclick="control('previous')" class="ctl" aria-label="Previous"><svg width="44" height="44" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
                     <button onclick="control('toggle')" id="play-btn" class="play" aria-label="Play or pause"><svg id="play-icon" width="44" height="44" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
                     <button onclick="control('next')" class="ctl" aria-label="Next"><svg width="44" height="44" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
                 </div>
+                </div>
             </div>
         </div>
         <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-6">
-            <div id="queue-card" class="glass p-10 flex-grow overflow-hidden flex flex-col">
-                <h2 id="queue-title" class="label mb-6 text-center">Up Next</h2>
-                <div id="queue-list" class="space-y-2"></div>
+            <div id="queue-card" class="glass px-6 py-8 flex-grow overflow-hidden flex flex-col">
+                <h2 id="queue-title" class="label mb-3 ml-2" style="font-weight:700">Up Next</h2>
+                <div id="queue-list" class="space-y-1"></div>
             </div>
-            <div id="jam-card" class="glass p-7 flex items-center gap-8">
-                <div id="qrcode" class="bg-white p-2.5 rounded-xl shadow-2xl"></div>
-                <div class="overflow-hidden">
-                    <p class="label mb-2">Join Jam</p>
-                    <p id="jam-display-url" class="mono text-sm truncate" style="color:var(--ink-3)"></p>
+            <div id="jam-card" class="glass p-5 flex items-center gap-5">
+                <div id="qrcode" class="bg-white p-2 shrink-0"></div>
+                <div class="overflow-hidden flex flex-col gap-1">
+                    <p style="font-size:1.05rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap">Join the Jam</p>
+                    <p style="font-size:.82rem;color:var(--ink-2)">Scan with your phone camera</p>
+                    <p id="jam-display-url" class="mono truncate" style="font-size:.75rem;color:var(--ink-3)"></p>
                 </div>
             </div>
         </div>
@@ -429,7 +456,7 @@
             const lf = settings.connected === 'lastfm';
             document.getElementById('connected-as').textContent = lf ? `Connected to Last.fm as ${settings.lastfmUser}` : 'Connected to Spotify';
             ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = lf);
-            document.getElementById('queue-label').textContent = lf ? 'RECENTLY PLAYED' : 'QUEUE';
+            document.getElementById('queue-label').textContent = lf ? 'Recently played' : 'Up Next queue';
             showOverlay('start');
         }
 
@@ -621,6 +648,7 @@
             document.getElementById('settings-btn').style.display = '';
             show('controls-container', config.controls && provider.canControl);
             show('progress-container', config.progress && provider.hasProgress);
+            show('player-card', (config.controls && provider.canControl) || (config.progress && provider.hasProgress));
             show('queue-card', config.queue);
             show('jam-card', config.jam);
             show('sidebar-section', config.queue || config.jam);
@@ -634,7 +662,7 @@
             document.getElementById('qrcode').innerHTML = '';
             if (settings.jam && config.jam) {
                 document.getElementById('jam-display-url').innerText = settings.jam;
-                new QRCode(document.getElementById("qrcode"), { text: settings.jam, width: 130, height: 130 });
+                new QRCode(document.getElementById("qrcode"), { text: settings.jam, width: 96, height: 96 });
             }
             lastArtUrl = null;
             shownSong = '';
@@ -741,7 +769,12 @@
 
         function setVibe(color) {
             document.body.style.setProperty('--vibe', color);
-            fadeLayer(document.getElementById('bg'), 'bg-layer', `radial-gradient(120% 120% at 20% 10%, ${color} 0%, color-mix(in srgb, ${color} 45%, black) 70%)`);
+            const deep = `color-mix(in srgb, ${color} 40%, #08080b)`;
+            const alt = `color-mix(in srgb, ${color} 55%, #6a5cff)`;
+            fadeLayer(document.getElementById('bg'), 'bg-layer',
+                `radial-gradient(45vw 45vw at 5% 0%, color-mix(in srgb, ${color} 75%, transparent), transparent 70%), ` +
+                `radial-gradient(40vw 40vw at 100% 100%, color-mix(in srgb, ${alt} 60%, transparent), transparent 70%), ` +
+                `radial-gradient(120% 90% at 15% 0%, ${color} 0%, ${deep} 60%, #050507 100%)`);
             fadeLayer(document.getElementById('art-box'), 'glow-layer', `color-mix(in srgb, ${color} 70%, transparent)`);
         }
 
