@@ -253,7 +253,7 @@
         <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-6">
             <div id="queue-card" class="glass px-6 py-8 flex-grow overflow-hidden flex flex-col">
                 <h2 id="queue-title" class="label mb-3 ml-2" style="font-weight:700">Up Next</h2>
-                <div id="queue-list" class="space-y-1"></div>
+                <div id="queue-list" class="space-y-1 flex-1 min-h-0 relative"></div>
             </div>
             <div id="jam-card" class="glass p-5 flex items-center gap-5">
                 <div id="qrcode" class="bg-white p-2 shrink-0"></div>
@@ -578,7 +578,7 @@
                 const res = await this.api('/queue');
                 if (res.status !== 200) return null;
                 const data = await res.json();
-                return (data.queue || []).slice(0, 5).map((track, index) => {
+                return (data.queue || []).slice(0, 20).map((track, index) => {
                     const images = (track.album || track).images || [];
                     const thumb = images[images.length - 1];
                     return { title: track.name, artist: artistName(track), art: thumb && thumb.url, onClick: () => this.skipTo(index) };
@@ -624,12 +624,12 @@
             },
 
             async nowPlaying() {
-                const result = await this.call('user.getrecenttracks', { limit: 6, extended: 0 });
+                const result = await this.call('user.getrecenttracks', { limit: 21, extended: 0 });
                 if (!result.ok) return null;
                 let tracks = result.data.recenttracks.track || [];
                 if (!Array.isArray(tracks)) tracks = [tracks];
                 const current = tracks.find(t => t['@attr'] && t['@attr'].nowplaying === 'true');
-                this.recent = tracks.filter(t => t !== current).slice(0, 5);
+                this.recent = tracks.filter(t => t !== current).slice(0, 20);
                 if (!current) return { empty: true };
                 return { title: current.name, artist: current.artist['#text'], art: this.art(current, 'extralarge'), isPlaying: true };
             },
@@ -841,7 +841,19 @@
                 lines[1].textContent = item.artist;
                 container.appendChild(div);
             });
+            fitQueue();
         }
+
+        // Show as many songs as fit in the card; hide the ones that would be cut off at the bottom
+        function fitQueue() {
+            const list = document.getElementById('queue-list');
+            const rows = [...list.children];
+            rows.forEach(row => row.style.display = '');
+            // Measure every row before hiding any, or hidden rows would let later ones slide up into view
+            const fits = rows.map(row => row.offsetTop + row.offsetHeight <= list.clientHeight);
+            rows.forEach((row, i) => { if (!fits[i]) row.style.display = 'none'; });
+        }
+        window.addEventListener('resize', fitQueue);
 
         async function control(cmd) {
             if (!provider || !provider.canControl) return;
