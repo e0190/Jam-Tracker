@@ -3,124 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Dashboard - E19</title>
+    <title>Jam Tracker - E19</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #000; color: white; font-family: 'Inter', sans-serif; transition: background-color 1.5s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
-        .bebas { font-family: 'Bebas Neue', cursive; }
-        .glass { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(50px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        :root {
+            --vibe: #1e1e24;
+            --ink: #fff; --ink-2: rgb(255 255 255 / .7); --ink-3: rgb(255 255 255 / .45);
+            --surface: rgb(0 0 0 / .32); --surface-hover: rgb(255 255 255 / .08);
+            --line: rgb(255 255 255 / .10); --line-strong: rgb(255 255 255 / .28);
+            --void: #08080A;
+            --r-sm: 12px; --r-md: 20px; --r-lg: 32px;
+            --ease: cubic-bezier(.2,.7,.2,1); --fast: 180ms;
+        }
+        html, body { height: 100%; }
+        body { margin: 0; color: var(--ink); font-family: 'Bricolage Grotesque', sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0b0b0e; }
 
-        #intro-screen { position: fixed; inset: 0; background: black; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
+        /* Each song gets its own background layer; switching only fades opacity (GPU, no repaint) */
+        #bg { position: fixed; inset: 0; z-index: -1; }
+        .bg-layer, .glow-layer { opacity: 0; transition: opacity 1.8s var(--ease); will-change: opacity; }
+        .bg-layer { position: absolute; inset: 0; }
+        .bg-layer.in, .glow-layer.in { opacity: 1; }
+        body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: .035; transform: translateZ(0);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+        .display { font-family: 'Syne', sans-serif; font-weight: 800; }
+        .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .label { font-size: .75rem; letter-spacing: .28em; text-transform: uppercase; font-weight: 700; color: var(--ink-3); }
+        .glass { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 30px 80px rgb(0 0 0 / .35); }
+
+        #intro-screen { position: fixed; inset: 0; background: var(--void); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5000; pointer-events: none; transition: opacity 1s ease; }
         #intro-text { font-size: 2rem; opacity: 0; animation: fadeInOut 2.5s ease-in-out forwards; letter-spacing: 0.5em; }
         @keyframes fadeInOut { 0% { opacity: 0; transform: scale(0.95); } 40% { opacity: 1; transform: scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.05); } }
 
-        .art-container { width: 35vw; height: 35vw; max-width: 450px; max-height: 450px; flex-shrink: 0; margin: 0 auto; position: relative; }
-        .album-art { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; box-shadow: 0 40px 100px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.15); position: relative; z-index: 2; }
-        #art-glow { position: absolute; inset: -30px; filter: blur(100px); opacity: 0.7; z-index: 1; border-radius: 50%; transition: background 2s ease; }
+        .art-container { width: 32vw; height: 32vw; max-width: 440px; max-height: 440px; flex-shrink: 0; margin: 0 auto; position: relative; }
+        .album-art { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; object-fit: cover; border-radius: var(--r-md); border: 1px solid rgb(255 255 255 / .12); box-shadow: 0 30px 80px rgb(0 0 0 / .45);
+            opacity: 0; transform: scale(.97); transition: opacity .8s var(--ease), transform .8s var(--ease); will-change: opacity, transform; }
+        .album-art.in { opacity: 1; transform: none; }
+        .glow-layer { position: absolute; inset: -24px; filter: blur(90px); border-radius: 50%; z-index: 1; }
 
-        .title-text { font-size: clamp(2.5rem, 6vw, 6rem); line-height: 0.8; word-break: break-word; }
-        .progress-bg { height: 8px; background: rgba(255,255,255,0.1); border-radius: 20px; width: 100%; position: relative; overflow: hidden; }
-        #progress-fill { height: 100%; background: white; border-radius: 20px; width: 0%; transition: width 0.5s linear; }
+        .title-text { font-size: clamp(1.75rem, 4.2vw, 5rem); line-height: .95; letter-spacing: -.03em; overflow-wrap: normal; text-wrap: balance; width: 100%; }
+        #title, #artist, #time-total { transition: opacity .32s var(--ease), transform .32s var(--ease); }
+        .swap-out { opacity: 0; transform: translateY(10px); }
+        .progress-bg { height: 6px; background: var(--line); border-radius: 999px; width: 100%; overflow: hidden; }
+        #progress-fill { height: 100%; width: 0%; background: #fff; border-radius: 999px; box-shadow: 0 0 12px rgb(255 255 255 / .5); transition: width 0.5s linear; }
 
-        .queue-item { transition: all 0.3s ease; border-radius: 20px; border: 1px solid transparent; }
+        .ctl { opacity: .55; transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease); }
+        .ctl:hover { opacity: 1; transform: scale(1.04); }
+        .play { background: #fff; border-radius: 999px; padding: 1.5rem; box-shadow: 0 16px 40px rgb(0 0 0 / .35); transition: transform var(--fast) var(--ease); }
+        .play:hover { transform: scale(1.04); } .play:active { transform: scale(.96); }
+        button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--line-strong); outline-offset: 3px; }
+
+        .queue-item { display: flex; align-items: center; gap: 1rem; padding: .75rem; border-radius: var(--r-md); border: 1px solid transparent; transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease), transform var(--fast) var(--ease); }
         .queue-item.clickable { cursor: pointer; }
-        .queue-item.clickable:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.1); transform: translateX(10px); }
+        .queue-item.clickable:hover { background: var(--surface-hover); border-color: var(--line); transform: translateX(6px); }
+        .q-enter { animation: qIn .5s var(--ease) both; }
+        @keyframes qIn { from { opacity: 0; transform: translateY(12px); } }
+        .thumb { width: 64px; height: 64px; flex-shrink: 0; border-radius: var(--r-sm); object-fit: cover; background: rgb(255 255 255 / .08); box-shadow: 0 8px 24px rgb(0 0 0 / .25); }
 
-        #setup-overlay { position: fixed; inset: 0; background: black; z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 2rem 0; }
-        .toggle-card { background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
-        .toggle-card:has(input:checked) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
-        .toggle-card:has(input:disabled) { opacity: 0.3; }
-        input[type="checkbox"] { width: 24px; height: 24px; accent-color: white; cursor: pointer; }
-        .field { width: 100%; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); padding: 1.1rem 1.5rem; border-radius: 30px; color: white; outline: none; text-align: center; font-size: 1.25rem; letter-spacing: 0.1em; transition: all 0.2s; }
-        .field:focus { border-color: white; }
-        .source-btn { padding: 1.1rem; border-radius: 30px; border: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); transition: all 0.2s; }
-        .source-btn.active { background: white; color: black; border-color: white; }
-        .help { font-size: 0.8rem; opacity: 0.5; line-height: 1.5; text-align: center; }
-        .help a { text-decoration: underline; }
-        .help code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 6px; user-select: all; }
-        #setup-error { color: #ff8a8a; text-align: center; font-size: 0.9rem; min-height: 1.2rem; }
-        #settings-btn { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 500; opacity: 0.15; transition: opacity 0.2s; }
+        #jam-card { border-left: 3px solid var(--vibe); transition: border-color 1.8s var(--ease); }
+
+        #setup-overlay { position: fixed; inset: 0; background: var(--void); z-index: 1000; display: none; align-items: center; justify-content: center; overflow-y: auto; padding: 2rem 0; }
+        .field { width: 100%; background: rgb(255 255 255 / .05); border: 1px solid var(--line); border-radius: var(--r-md); padding: 1.1rem 1.25rem; color: #fff; text-align: center; font: 600 1rem 'Bricolage Grotesque'; letter-spacing: .08em; outline: none; transition: border-color var(--fast); }
+        .field:focus { border-color: var(--line-strong); }
+        .field::placeholder { color: var(--ink-3); }
+        .source-btn { padding: 1rem; border-radius: var(--r-md); border: 1px solid var(--line); background: rgb(255 255 255 / .04); color: var(--ink-2); font: 700 .8rem 'Bricolage Grotesque'; letter-spacing: .2em; text-transform: uppercase; transition: all var(--fast) var(--ease); }
+        .source-btn:hover { border-color: var(--line-strong); }
+        .source-btn.active { background: #fff; color: #000; border-color: #fff; }
+        .toggle-card { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-radius: var(--r-md); background: rgb(255 255 255 / .04); border: 1px solid var(--line); transition: all var(--fast) var(--ease); cursor: pointer; }
+        .toggle-card:has(input:checked) { background: rgb(255 255 255 / .09); border-color: var(--line-strong); }
+        .toggle-card:has(input:disabled) { opacity: .3; cursor: default; }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: #fff; cursor: pointer; }
+        .help { font-size: .8rem; color: var(--ink-3); line-height: 1.6; text-align: center; }
+        .help a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+        .help code { font-family: 'JetBrains Mono', monospace; background: rgb(255 255 255 / .08); padding: .1rem .4rem; border-radius: 6px; user-select: all; color: var(--ink-2); }
+        .steps { counter-reset: step; display: flex; flex-direction: column; gap: 1rem; }
+        .steps li { counter-increment: step; position: relative; padding: 1.1rem 1.1rem 1.1rem 3.4rem; border-radius: var(--r-md); background: rgb(255 255 255 / .04); border: 1px solid var(--line); display: flex; flex-direction: column; gap: .6rem; }
+        .steps li::before { content: counter(step); position: absolute; left: 1.1rem; top: 1.05rem; width: 1.6rem; height: 1.6rem; border-radius: 999px; background: #fff; color: #000; font: 800 .85rem 'Bricolage Grotesque'; display: flex; align-items: center; justify-content: center; }
+        .steps li.done::before { content: '✓'; }
+        .step-title { font-weight: 800; font-size: 1.05rem; }
+        .step-text { font-size: .9rem; color: var(--ink-2); line-height: 1.5; }
+        .step-text b { color: #fff; }
+        .step-btn { align-self: flex-start; background: #fff; color: #000; border-radius: 999px; padding: .6rem 1.1rem; font: 700 .9rem 'Bricolage Grotesque'; transition: transform var(--fast) var(--ease); }
+        .step-btn:hover { transform: scale(1.03); }
+        .fill-row { display: grid; grid-template-columns: 7.5rem 1fr auto; align-items: center; gap: .6rem; font-size: .85rem; color: var(--ink-3); }
+        .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .08); padding: .35rem .55rem; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .copy { border: 1px solid var(--line-strong); border-radius: 999px; padding: .35rem .8rem; font: 700 .78rem 'Bricolage Grotesque'; color: #fff; transition: background var(--fast); min-width: 4.2rem; }
+        .copy:hover { background: var(--surface-hover); }
+        .paste-row { display: flex; gap: .5rem; align-items: center; }
+        .paste-row .field { text-align: left; }
+        select.field { text-align: left; appearance: none; cursor: pointer; }
+        select.field option { background: #111; color: #fff; }
+        .extras summary { cursor: pointer; list-style: none; text-align: center; }
+        .extras summary::after { content: ' ▾'; }
+        .extras[open] summary::after { content: ' ▴'; }
+        #setup-error { color: #ff9c9c; text-align: center; font-size: .9rem; min-height: 1.2rem; }
+        .launch { width: 100%; background: #fff; color: #000; border-radius: var(--r-md); padding: 1.1rem; font: 800 1.05rem 'Bricolage Grotesque'; letter-spacing: .02em; transition: transform var(--fast) var(--ease); }
+        .launch:hover { transform: scale(1.01); } .launch:active { transform: scale(.98); }
+        #settings-btn { position: fixed; top: 1.25rem; right: 1.25rem; z-index: 500; opacity: 0.15; transition: opacity var(--fast); }
         #settings-btn:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
+    <div id="bg"></div>
 
     <div id="intro-screen">
-        <div id="intro-text" class="bebas">MADE BY E19</div>
+        <div id="intro-text" class="display">MADE BY E19</div>
     </div>
 
     <div id="setup-overlay">
-        <div class="glass p-12 rounded-[60px] max-w-xl w-full border-2 border-white/5 mx-4 my-auto">
-            <h2 class="text-5xl bebas mb-8 tracking-tight italic text-center">DASHBOARD CONFIG</h2>
+        <div class="glass p-10 max-w-xl w-full mx-4 my-auto">
+            <h2 class="display text-4xl mb-2 text-center" style="letter-spacing:-.02em">Set up</h2>
+            <p class="help mb-6">Takes about 2 minutes. You only do this once.</p>
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <button id="src-spotify" onclick="pickSource('spotify')" class="source-btn bebas text-xl tracking-widest">SPOTIFY</button>
-                <button id="src-lastfm" onclick="pickSource('lastfm')" class="source-btn bebas text-xl tracking-widest">ANY APP (LAST.FM)</button>
+            <p class="label mb-3" style="color:var(--ink-2)">What do you listen on?</p>
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <button id="src-spotify" onclick="pickSource('spotify')" class="source-btn">Spotify</button>
+                <button id="src-lastfm" onclick="pickSource('lastfm')" class="source-btn">Something else</button>
             </div>
 
-            <div id="spotify-fields" class="space-y-3 mb-6">
-                <input type="text" id="client-id" placeholder="SPOTIFY CLIENT ID" class="field bebas" autocomplete="off" spellcheck="false">
-                <p class="help">Make a free app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, tick "Web API", and add this Redirect URI:<br><code id="redirect-display"></code><br>Then copy its Client ID here.</p>
-            </div>
+            <!-- Spotify: make your own free Spotify app, paste its Client ID -->
+            <ol id="spotify-fields" class="steps mb-6">
+                <li>
+                    <p class="step-title">Make a free Spotify app</p>
+                    <p class="step-text">We'll open Spotify's page in a new tab. Log in with your normal Spotify account.</p>
+                    <button class="step-btn" onclick="openSpotifySetup()">Open Spotify's page ↗</button>
+                </li>
+                <li>
+                    <p class="step-title">Fill in the form</p>
+                    <div class="fill-row"><span>App name</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
+                    <div class="fill-row"><span>App description</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
+                    <div class="fill-row"><span>Redirect URI</span><code id="redirect-display"></code><button class="copy" onclick="copyText(REDIRECT_URI, this)">Copy</button></div>
+                    <p class="step-text">Paste the Redirect URI, click <b>Add</b>, tick <b>Web API</b>, tick the terms box, then click <b>Save</b>.</p>
+                </li>
+                <li>
+                    <p class="step-title">Copy your Client ID</p>
+                    <p class="step-text">On the page that opens, copy the long code under <b>Client ID</b> and paste it here.</p>
+                    <div class="paste-row">
+                        <input type="text" id="client-id" placeholder="Client ID" class="field" autocomplete="off" spellcheck="false">
+                        <button class="copy" onclick="pasteInto('client-id', this)">Paste</button>
+                    </div>
+                </li>
+            </ol>
 
-            <div id="lastfm-fields" class="space-y-3 mb-6" style="display:none">
-                <input type="text" id="lastfm-user" placeholder="LAST.FM USERNAME" class="field bebas" autocomplete="off" spellcheck="false">
-                <input type="text" id="lastfm-key" placeholder="LAST.FM API KEY" class="field bebas" autocomplete="off" spellcheck="false">
-                <p class="help">Works with Apple Music, YouTube Music, Amazon Music, Pandora, Tidal, SoundCloud and more. Connect your music app to <a href="https://www.last.fm/settings/applications" target="_blank" rel="noopener">Last.fm</a> (or use the <a href="https://web-scrobbler.com" target="_blank" rel="noopener">Web Scrobbler</a> extension), then get a free API key at <a href="https://www.last.fm/api/account/create" target="_blank" rel="noopener">last.fm/api/account/create</a>.<br>Shows what's playing only: no play buttons or queue.</p>
-            </div>
+            <!-- Everything else: Last.fm. Your app reports what you play, the dashboard reads it -->
+            <ol id="lastfm-fields" class="steps mb-6" style="display:none">
+                <li>
+                    <p class="step-title">Connect your music to Last.fm</p>
+                    <p class="step-text">Last.fm is a free site that keeps track of what you play. Make an account, then connect your music app:</p>
+                    <select id="app-pick" class="field" onchange="showAppHelp()">
+                        <option value="">Pick your music app…</option>
+                        <option value="settings">Tidal or Deezer</option>
+                        <option value="extension">Apple Music, YouTube Music, Amazon Music, Pandora, or SoundCloud</option>
+                    </select>
+                    <p id="app-help" class="step-text" style="display:none"></p>
+                    <button id="app-btn" class="step-btn" style="display:none" onclick="openAppHelp()"></button>
+                </li>
+                <li>
+                    <p class="step-title">Get a free key</p>
+                    <p class="step-text">We'll open Last.fm's key page. Put any name in <b>Application name</b>, leave the rest empty, and click <b>Submit</b>.</p>
+                    <div class="fill-row"><span>Application name</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
+                    <button class="step-btn" onclick="openTab('https://www.last.fm/api/account/create')">Open Last.fm's key page ↗</button>
+                </li>
+                <li>
+                    <p class="step-title">Paste your key and username</p>
+                    <p class="step-text">Copy the <b>API key</b> from the page that opens (not the "shared secret").</p>
+                    <div class="paste-row">
+                        <input type="text" id="lastfm-key" placeholder="API key" class="field" autocomplete="off" spellcheck="false">
+                        <button class="copy" onclick="pasteInto('lastfm-key', this)">Paste</button>
+                    </div>
+                    <input type="text" id="lastfm-user" placeholder="Your Last.fm username" class="field mt-2" autocomplete="off" spellcheck="false">
+                </li>
+            </ol>
 
-            <div class="space-y-4 mb-6">
-                <input type="text" id="jam-input" placeholder="PASTE JAM LINK"
-                    class="w-full bg-white/5 border-2 border-white/10 p-6 rounded-[30px] text-white outline-none focus:border-white transition-all text-center text-xl bebas tracking-widest mb-4">
-                <div class="grid grid-cols-2 gap-4">
-                    <label class="toggle-card"><span class="bebas text-xl">PLAY BUTTONS</span><input type="checkbox" id="check-controls" checked></label>
-                    <label class="toggle-card"><span class="bebas text-xl">PROGRESS BAR</span><input type="checkbox" id="check-progress" checked></label>
-                    <label class="toggle-card"><span class="bebas text-xl" id="queue-label">QUEUE</span><input type="checkbox" id="check-queue" checked></label>
-                    <label class="toggle-card"><span class="bebas text-xl">JAM QR</span><input type="checkbox" id="check-jam" checked></label>
+            <details class="extras mb-5">
+                <summary class="label" style="color:var(--ink-2)">Extras (optional)</summary>
+                <div class="space-y-3 mt-4">
+                    <p class="step-text">Hosting a Spotify Jam? Paste its invite link and friends can scan a QR code to join.</p>
+                    <input type="text" id="jam-input" placeholder="Jam link" class="field" autocomplete="off" spellcheck="false">
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Play Buttons</span><input type="checkbox" id="check-controls" checked></label>
+                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Progress Bar</span><input type="checkbox" id="check-progress" checked></label>
+                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)" id="queue-label">QUEUE</span><input type="checkbox" id="check-queue" checked></label>
+                        <label class="toggle-card"><span class="label" style="color:var(--ink-2)">Jam QR</span><input type="checkbox" id="check-jam" checked></label>
+                    </div>
                 </div>
-            </div>
+            </details>
             <p id="setup-error" class="mb-4"></p>
-            <button onclick="launch()" class="w-full bg-white text-black font-black p-6 rounded-[30px] hover:scale-[1.02] active:scale-[0.98] transition-all text-2xl bebas tracking-tighter uppercase italic">
-                Connect & Launch
-            </button>
+            <button onclick="launch()" class="launch" id="launch-btn">Start</button>
         </div>
     </div>
 
-    <button id="settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="28" height="28" fill="white" viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
+    <button id="settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="28" height="28" fill="white" viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.880l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.030 7.030 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.22.08.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></button>
 
     <div id="main-dashboard" class="grid grid-cols-12 gap-12 w-full h-full max-w-[1800px] px-16 items-center" style="display: none; opacity: 0; transition: opacity 1.5s ease;">
         <div id="player-section" class="col-span-7 flex flex-col text-center">
-            <div class="art-container mb-12">
-                <div id="art-glow"></div>
-                <img id="art" src="" crossorigin="anonymous" class="album-art">
-            </div>
+            <div class="art-container mb-10" id="art-box"></div>
             <div class="flex flex-col gap-2 px-10 items-center">
-                <h1 id="title" class="bebas title-text tracking-tighter uppercase italic">Waiting...</h1>
-                <p id="artist" class="text-3xl font-bold opacity-40 italic tracking-tight mb-8"></p>
-                <div id="progress-container" class="flex items-center gap-6 w-full max-w-3xl">
-                    <span id="time-cur" class="text-sm opacity-50 font-mono">0:00</span>
+                <h1 id="title" class="display title-text">Waiting...</h1>
+                <p id="artist" class="text-2xl font-semibold mb-8" style="color:var(--ink-2)"></p>
+                <div id="progress-container" class="flex items-center gap-5 w-full max-w-3xl">
+                    <span id="time-cur" class="mono text-sm" style="color:var(--ink-3)">0:00</span>
                     <div class="progress-bg"><div id="progress-fill"></div></div>
-                    <span id="time-total" class="text-sm opacity-50 font-mono">0:00</span>
+                    <span id="time-total" class="mono text-sm" style="color:var(--ink-3)">0:00</span>
                 </div>
-                <div id="controls-container" class="flex items-center justify-center gap-16 mt-10">
-                    <button onclick="control('previous')" class="opacity-40 hover:opacity-100 hover:scale-125 transition-all"><svg width="50" height="50" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
-                    <button onclick="control('toggle')" id="play-btn" class="bg-white rounded-full p-8 hover:scale-110 active:scale-95 transition-all shadow-2xl"><svg id="play-icon" width="50" height="50" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
-                    <button onclick="control('next')" class="opacity-40 hover:opacity-100 hover:scale-125 transition-all"><svg width="50" height="50" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
+                <div id="controls-container" class="flex items-center justify-center gap-14 mt-10">
+                    <button onclick="control('previous')" class="ctl" aria-label="Previous"><svg width="44" height="44" fill="white" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6L18 18V6z"/></svg></button>
+                    <button onclick="control('toggle')" id="play-btn" class="play" aria-label="Play or pause"><svg id="play-icon" width="44" height="44" fill="black" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+                    <button onclick="control('next')" class="ctl" aria-label="Next"><svg width="44" height="44" fill="white" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6z"/></svg></button>
                 </div>
             </div>
         </div>
-        <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-8">
-            <div id="queue-card" class="glass rounded-[60px] p-12 flex-grow overflow-hidden flex flex-col">
-                <h2 id="queue-title" class="bebas text-3xl opacity-20 mb-8 tracking-[0.4em] uppercase italic text-center">Up Next</h2>
-                <div id="queue-list" class="space-y-6"></div>
+        <div id="sidebar-section" class="col-span-5 flex flex-col h-[85vh] gap-6">
+            <div id="queue-card" class="glass p-10 flex-grow overflow-hidden flex flex-col">
+                <h2 id="queue-title" class="label mb-6 text-center">Up Next</h2>
+                <div id="queue-list" class="space-y-2"></div>
             </div>
-            <div id="jam-card" class="glass rounded-[60px] p-8 flex items-center gap-10 border-l-[12px] border-white">
-                <div id="qrcode" class="bg-white p-3 rounded-3xl shadow-2xl"></div>
+            <div id="jam-card" class="glass p-7 flex items-center gap-8">
+                <div id="qrcode" class="bg-white p-2.5 rounded-xl shadow-2xl"></div>
                 <div class="overflow-hidden">
-                    <p class="bebas text-xl opacity-30 tracking-widest uppercase mb-1">Join Jam</p>
-                    <p id="jam-display-url" class="text-sm font-mono truncate opacity-40 font-bold"></p>
+                    <p class="label mb-2">Join Jam</p>
+                    <p id="jam-display-url" class="mono text-sm truncate" style="color:var(--ink-3)"></p>
                 </div>
             </div>
         </div>
@@ -186,8 +290,86 @@
             // Last.fm can't control playback or see song length
             ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = !isSpotify);
             document.getElementById('queue-label').textContent = isSpotify ? 'QUEUE' : 'RECENTLY PLAYED';
+            document.getElementById('launch-btn').textContent = isSpotify ? 'Connect Spotify' : 'Start';
             document.getElementById('setup-error').textContent = '';
         }
+
+        // ---------- Setup helpers: open the right page, copy what to type, paste what comes back ----------
+
+        function openTab(url) {
+            window.open(url, '_blank', 'noopener');
+        }
+
+        // Copies the Redirect URI first, so it's ready to paste on Spotify's form
+        async function openSpotifySetup() {
+            await copyText(REDIRECT_URI);
+            openTab('https://developer.spotify.com/dashboard/create');
+            document.querySelector('#spotify-fields li').classList.add('done');
+        }
+
+        async function copyText(text, button) {
+            let ok = false;
+            try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+                // Older browsers: copy through a hidden text box
+                const box = document.createElement('textarea');
+                box.value = text; document.body.appendChild(box); box.select();
+                try { ok = document.execCommand('copy'); } catch (e2) {}
+                box.remove();
+            }
+            if (button) flash(button, ok ? 'Copied!' : 'Select it');
+            return ok;
+        }
+
+        // Reading the clipboard asks the browser for permission the first time
+        async function pasteInto(id, button) {
+            const field = document.getElementById(id);
+            try {
+                field.value = (await navigator.clipboard.readText()).trim();
+                field.dispatchEvent(new Event('input'));
+                flash(button, 'Pasted!');
+            } catch (e) {
+                field.focus();
+                flash(button, 'Press Ctrl+V');
+            }
+        }
+
+        function flash(button, text) {
+            const old = button.dataset.label || button.textContent;
+            button.dataset.label = old;
+            button.textContent = text;
+            clearTimeout(button._t);
+            button._t = setTimeout(() => button.textContent = old, 1600);
+        }
+
+        const APP_HELP = {
+            settings: { text: 'Open your music app’s <b>Settings</b>, find <b>Last.fm</b>, and sign in. That’s it.', button: 'Make a Last.fm account ↗', url: 'https://www.last.fm/join' },
+            extension: { text: 'Add the free <b>Web Scrobbler</b> extension to your browser and sign in to Last.fm in it. Then play music in your browser (like music.apple.com or music.youtube.com).', button: 'Get Web Scrobbler ↗', url: 'https://web-scrobbler.com' }
+        };
+
+        function showAppHelp() {
+            const help = APP_HELP[document.getElementById('app-pick').value];
+            document.getElementById('app-help').style.display = help ? '' : 'none';
+            document.getElementById('app-btn').style.display = help ? '' : 'none';
+            if (!help) return;
+            document.getElementById('app-help').innerHTML = help.text;
+            document.getElementById('app-btn').textContent = help.button;
+        }
+
+        function openAppHelp() {
+            const help = APP_HELP[document.getElementById('app-pick').value];
+            if (help) { openTab(help.url); document.querySelector('#lastfm-fields li').classList.add('done'); }
+        }
+
+        // Tick off a step once its code looks right
+        function watchField(id, pattern, stepSelector) {
+            const field = document.getElementById(id);
+            field.addEventListener('input', () => {
+                field.value = field.value.trim();
+                document.querySelector(stepSelector).classList.toggle('done', pattern.test(field.value));
+            });
+        }
+        watchField('client-id', /^[0-9a-f]{32}$/i, '#spotify-fields li:last-child');
+        watchField('lastfm-key', /^[0-9a-f]{32}$/i, '#lastfm-fields li:last-child');
 
         function showSetup(error) {
             document.getElementById('setup-error').textContent = error || '';
@@ -214,7 +396,6 @@
                 jam: document.getElementById('check-jam').checked
             };
             const error = msg => { document.getElementById('setup-error').textContent = msg; };
-            if (settings.config.jam && !settings.jam) return error('Paste a Jam link, or turn off Jam QR.');
 
             if (settings.source === 'spotify') {
                 if (!/^[0-9a-f]{32}$/i.test(settings.clientId)) return error('That doesn’t look like a Spotify Client ID (32 letters and numbers).');
@@ -367,7 +548,7 @@
 
         function startApp() {
             provider = settings.source === 'lastfm' ? lastfm : spotify;
-            const config = settings.config;
+            const config = { ...settings.config, jam: settings.config.jam && !!settings.jam }; // no Jam link = no QR card
             const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
             document.getElementById('setup-overlay').style.display = 'none';
             document.getElementById('settings-btn').style.display = '';
@@ -379,6 +560,7 @@
             document.getElementById('player-section').className = (config.queue || config.jam ? 'col-span-7' : 'col-span-12') + ' flex flex-col text-center';
             document.getElementById('queue-title').textContent = provider.listTitle;
             document.getElementById('title').innerText = 'Waiting...';
+            document.getElementById('art-box').querySelectorAll('.album-art').forEach(o => o.remove());
             document.getElementById('artist').innerText = '';
             document.getElementById('main-dashboard').style.display = 'grid';
             setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
@@ -388,6 +570,8 @@
                 new QRCode(document.getElementById("qrcode"), { text: settings.jam, width: 130, height: 130 });
             }
             lastArtUrl = null;
+            shownSong = '';
+            shownList = '';
             updateLoop();
         }
 
@@ -414,36 +598,99 @@
             if (now.empty) {
                 isPlaying = false;
                 setPlayIcon();
-                if (provider === lastfm) { document.getElementById('title').innerText = 'Nothing playing'; document.getElementById('artist').innerText = ''; }
+                if (provider === lastfm) setSongText('Nothing playing', '', null);
                 return;
             }
             isPlaying = !!now.isPlaying;
             setPlayIcon();
             if (!now.title) return;
-            document.getElementById('title').innerText = now.title;
-            document.getElementById('artist').innerText = now.artist || '';
+            setSongText(now.title, now.artist || '', now.duration ? formatTime(now.duration) : null);
             if (now.art && now.art !== lastArtUrl) {
                 lastArtUrl = now.art;
-                const img = document.getElementById('art');
-                img.crossOrigin = "anonymous";
-                img.onload = () => updateVibeColors(img);
-                img.src = now.art;
+                showArt(now.art);
             }
             if (now.duration) {
                 document.getElementById('progress-fill').style.width = Math.min(100, (now.progress / now.duration) * 100) + '%';
                 document.getElementById('time-cur').innerText = formatTime(now.progress);
-                document.getElementById('time-total').innerText = formatTime(now.duration);
             }
         }
 
+        // Old title drifts out, new one drifts in. Does nothing if the song didn't change.
+        let shownSong = '';
+        function setSongText(title, artist, total) {
+            const els = ['title', 'artist', 'time-total'].map(id => document.getElementById(id));
+            const key = title + '\n' + artist;
+            if (key === shownSong) { if (total) els[2].innerText = total; return; }
+            const first = !shownSong;
+            shownSong = key;
+            const apply = () => {
+                els[0].innerText = title; els[1].innerText = artist;
+                fitTitle();
+                if (total) els[2].innerText = total;
+                els.forEach(el => el.classList.remove('swap-out'));
+            };
+            if (first) return apply();
+            els.forEach(el => el.classList.add('swap-out'));
+            setTimeout(apply, 320);
+        }
+
+        // Long words shrink the title instead of breaking mid-word
+        function fitTitle() {
+            const el = document.getElementById('title');
+            el.style.fontSize = '';
+            let size = parseFloat(getComputedStyle(el).fontSize);
+            while (el.scrollWidth > el.clientWidth + 1 && size > 18) { size *= 0.92; el.style.fontSize = size + 'px'; }
+        }
+        window.addEventListener('resize', fitTitle);
+
+        // New cover fades in over the old one, then the old one is removed
+        function showArt(url) {
+            const box = document.getElementById('art-box');
+            const img = document.createElement('img');
+            img.className = 'album-art';
+            img.crossOrigin = 'anonymous';
+            img.alt = '';
+            img.onload = () => {
+                const old = [...box.querySelectorAll('.album-art')].filter(o => o !== img);
+                requestAnimationFrame(() => requestAnimationFrame(() => img.classList.add('in')));
+                setTimeout(() => old.forEach(o => o.remove()), 900);
+                updateVibeColors(img);
+            };
+            img.onerror = () => img.remove();
+            box.appendChild(img);
+            img.src = url;
+        }
+
+        // Adds a new layer on top, fades it in, then removes the layers under it
+        function fadeLayer(parent, cls, background) {
+            const old = parent.querySelectorAll('.' + cls);
+            const el = document.createElement('div');
+            el.className = cls;
+            el.style.background = background;
+            parent.appendChild(el);
+            requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
+            setTimeout(() => old.forEach(o => o.remove()), 1900);
+        }
+
+        function setVibe(color) {
+            document.body.style.setProperty('--vibe', color);
+            fadeLayer(document.getElementById('bg'), 'bg-layer', `radial-gradient(120% 120% at 20% 10%, ${color} 0%, color-mix(in srgb, ${color} 45%, black) 70%)`);
+            fadeLayer(document.getElementById('art-box'), 'glow-layer', `color-mix(in srgb, ${color} 70%, transparent)`);
+        }
+
+        let shownList = '';
         function showList(items) {
+            const key = items.map(i => i.title + '|' + i.artist).join('\n');
+            if (key === shownList) return; // same list: leave it alone so it doesn't flicker every few seconds
+            shownList = key;
             const container = document.getElementById('queue-list');
             container.innerHTML = '';
-            items.forEach(item => {
+            items.forEach((item, k) => {
                 const div = document.createElement('div');
-                div.className = 'queue-item flex items-center gap-6 p-4' + (item.onClick ? ' clickable' : '');
+                div.className = 'queue-item q-enter' + (item.onClick ? ' clickable' : '');
+                div.style.animationDelay = (120 + k * 60) + 'ms';
                 if (item.onClick) div.onclick = item.onClick;
-                div.innerHTML = `<img class="w-20 h-20 rounded-2xl shadow-lg bg-white/10"><div class="overflow-hidden"><p class="bebas text-3xl truncate leading-none mb-2"></p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest"></p></div>`;
+                div.innerHTML = `<img class="thumb" alt=""><div class="overflow-hidden text-left"><p class="text-xl font-bold truncate leading-tight mb-1"></p><p class="label truncate"></p></div>`;
                 // textContent, not innerHTML, so names with < or & show correctly
                 if (item.art) div.querySelector('img').src = item.art;
                 const lines = div.querySelectorAll('p');
@@ -495,11 +742,9 @@
                 let {r, g, b} = bestColor;
                 if (bestColor.score < 0.2) { r = Math.min(255, r + 30); g = Math.min(255, g + 30); b = Math.min(255, b + 30); }
 
-                const finalColor = `rgb(${r}, ${g}, ${b})`;
-                document.body.style.backgroundColor = finalColor;
-                document.getElementById('art-glow').style.background = finalColor;
+                setVibe(`rgb(${r}, ${g}, ${b})`);
             } catch (e) {
-                document.body.style.backgroundColor = '#121212';
+                setVibe('#121212');
             }
         }
 
