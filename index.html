@@ -164,7 +164,7 @@
                     <p class="step-title">Get a free key</p>
                     <p class="step-text">We'll open Last.fm's key page. Put any name in <b>Application name</b>, leave the rest empty, and click <b>Submit</b>.</p>
                     <div class="fill-row"><span>Application name</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
-                    <button class="step-btn" onclick="openTab('https://www.last.fm/api/account/create')">Open Last.fm's key page ↗</button>
+                    <button class="step-btn" onclick="openTab('https://www.last.fm/api/account/create'); setDone(this.closest('li'), true)">Open Last.fm's key page ↗</button>
                 </li>
                 <li>
                     <p class="step-title">Paste your key and username</p>
@@ -272,12 +272,13 @@
 
         function fillSetup() {
             document.getElementById('redirect-display').textContent = REDIRECT_URI;
-            document.getElementById('client-id').value = settings.clientId || '';
+            document.getElementById('client-id').value = settings.clientId || store.get('draft_client-id') || '';
             document.getElementById('lastfm-user').value = settings.lastfmUser || '';
-            document.getElementById('lastfm-key').value = settings.lastfmKey || '';
+            document.getElementById('lastfm-key').value = settings.lastfmKey || store.get('draft_lastfm-key') || '';
             document.getElementById('jam-input').value = settings.jam || '';
             ['controls', 'progress', 'queue', 'jam'].forEach(k => document.getElementById('check-' + k).checked = settings.config[k] !== false);
             pickSource(settings.source || 'spotify');
+            restoreChecklist();
         }
 
         function pickSource(source) {
@@ -304,7 +305,7 @@
         async function openSpotifySetup() {
             await copyText(REDIRECT_URI);
             openTab('https://developer.spotify.com/dashboard/create');
-            document.querySelector('#spotify-fields li').classList.add('done');
+            setDone(document.querySelector('#spotify-fields li'), true);
         }
 
         async function copyText(text, button) {
@@ -316,7 +317,10 @@
                 try { ok = document.execCommand('copy'); } catch (e2) {}
                 box.remove();
             }
-            if (button) flash(button, ok ? 'Copied!' : 'Select it');
+            if (button) {
+                flash(button, ok ? 'Copied!' : 'Select it');
+                if (ok && button.closest('.steps li')) setDone(button.closest('.steps li'), true);
+            }
             return ok;
         }
 
@@ -357,7 +361,25 @@
 
         function openAppHelp() {
             const help = APP_HELP[document.getElementById('app-pick').value];
-            if (help) { openTab(help.url); document.querySelector('#lastfm-fields li').classList.add('done'); }
+            if (help) { openTab(help.url); setDone(document.querySelector('#lastfm-fields li'), true); }
+        }
+
+        // The checklist is saved in this browser, so ticks are still there when setup is opened again
+        function stepId(li) {
+            return li.parentElement.id + '-' + [...li.parentElement.children].indexOf(li);
+        }
+
+        function setDone(li, on) {
+            if (!li) return;
+            li.classList.toggle('done', on);
+            const done = new Set(store.get('steps_done') || []);
+            on ? done.add(stepId(li)) : done.delete(stepId(li));
+            store.set('steps_done', [...done]);
+        }
+
+        function restoreChecklist() {
+            const done = new Set(store.get('steps_done') || []);
+            document.querySelectorAll('.steps li').forEach(li => li.classList.toggle('done', done.has(stepId(li))));
         }
 
         // Tick off a step once its code looks right
@@ -365,7 +387,8 @@
             const field = document.getElementById(id);
             field.addEventListener('input', () => {
                 field.value = field.value.trim();
-                document.querySelector(stepSelector).classList.toggle('done', pattern.test(field.value));
+                store.set('draft_' + id, field.value); // keep what was pasted if setup is closed before finishing
+                setDone(document.querySelector(stepSelector), pattern.test(field.value));
             });
         }
         watchField('client-id', /^[0-9a-f]{32}$/i, '#spotify-fields li:last-child');
