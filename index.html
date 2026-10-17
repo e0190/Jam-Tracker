@@ -98,37 +98,81 @@
         const CLIENT_ID = 'c43fb52c4e2c49499f2802ccd23699fb';
         const REDIRECT_URI = window.location.origin + '/';
         let accessToken = null;
+        let refreshToken = sessionStorage.getItem('refresh_token');
+        let tokenExpires = 0;
         let config = {};
+        let isPlaying = false;
+        let lastArtUrl = null;
+        let loopTimer = null;
 
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
+            // Remove ?code= from the address bar so refreshing the page doesn't reuse a spent code
+            if (code || urlParams.get('error')) history.replaceState(null, '', window.location.pathname);
             setTimeout(() => {
                 document.getElementById('intro-screen').style.opacity = '0';
                 setTimeout(() => {
                     document.getElementById('intro-screen').style.display = 'none';
                     if (code) exchangeToken(code);
-                    else document.getElementById('setup-overlay').style.display = 'flex';
+                    else if (refreshToken) refreshAccess().then(ok => ok ? startApp() : showSetup());
+                    else showSetup();
                 }, 1000);
             }, 2600);
         };
 
+        function showSetup() {
+            document.getElementById('setup-overlay').style.display = 'flex';
+        }
+
         function launch() {
-            const jamLink = document.getElementById('jam-input').value;
-            if (!jamLink) return alert("Please paste a Jam link first!");
-            config = { controls: document.getElementById('check-controls').checked, progress: document.getElementById('check-progress').checked, queue: document.getElementById('check-queue').checked, jam: document.getElementById('check-jam').checked };
+            const jamLink = document.getElementById('jam-input').value.trim();
+            const wantsJam = document.getElementById('check-jam').checked;
+            if (wantsJam && !jamLink) return alert("Please paste a Jam link first!");
+            config = { controls: document.getElementById('check-controls').checked, progress: document.getElementById('check-progress').checked, queue: document.getElementById('check-queue').checked, jam: wantsJam };
             sessionStorage.setItem('jam_link', jamLink);
             sessionStorage.setItem('dash_config', JSON.stringify(config));
             const scope = encodeURIComponent('user-read-currently-playing user-read-playback-state user-modify-playback-state');
             window.location.href = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${scope}`;
         }
 
+        function saveTokens(data) {
+            accessToken = data.access_token;
+            tokenExpires = Date.now() + (data.expires_in || 3600) * 1000;
+            if (data.refresh_token) {
+                refreshToken = data.refresh_token;
+                sessionStorage.setItem('refresh_token', refreshToken);
+            }
+        }
+
         async function exchangeToken(code) {
             try {
                 const res = await fetch('/api/token', { method: 'POST', body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }), headers: { 'Content-Type': 'application/json' } });
                 const data = await res.json();
-                if (data.access_token) { accessToken = data.access_token; startApp(); }
-            } catch (e) { document.getElementById('setup-overlay').style.display = 'flex'; }
+                if (res.ok && data.access_token) { saveTokens(data); startApp(); }
+                else showSetup();
+            } catch (e) { showSetup(); }
+        }
+
+        async function refreshAccess() {
+            if (!refreshToken) return false;
+            try {
+                const res = await fetch('/api/token', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }), headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (res.ok && data.access_token) { saveTokens(data); return true; }
+            } catch (e) { console.error(e); }
+            sessionStorage.removeItem('refresh_token');
+            refreshToken = null;
+            return false;
+        }
+
+        // Every Spotify call goes through here: gets a new token when the old one is about to expire or gets rejected
+        async function spotify(path, options = {}) {
+            if (Date.now() > tokenExpires - 60000) await refreshAccess();
+            const call = () => fetch('https://api.spotify.com/v1/me/player' + path, { ...options, headers: { 'Authorization': `Bearer ${accessToken}` } });
+            let res = await call();
+            if (res.status === 401 && await refreshAccess()) res = await call();
+            return res;
         }
 
         function startApp() {
@@ -146,43 +190,60 @@
             document.getElementById('main-dashboard').style.display = 'grid';
             setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
             const jam = sessionStorage.getItem('jam_link');
-            if (jam) {
+            if (jam && config.jam) {
                 document.getElementById('jam-display-url').innerText = jam;
+                document.getElementById('qrcode').innerHTML = '';
                 new QRCode(document.getElementById("qrcode"), { text: jam, width: 130, height: 130 });
             }
             updateLoop();
         }
 
+        // Only one loop ever runs: calling this again restarts the timer instead of starting a second loop
         async function updateLoop() {
+            clearTimeout(loopTimer);
             if (!accessToken) return;
             await fetchPlayback();
             if (config.queue) await fetchQueue();
-            setTimeout(updateLoop, 3000);
+            clearTimeout(loopTimer);
+            loopTimer = setTimeout(updateLoop, 3000);
         }
 
         async function fetchPlayback() {
             try {
-                const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-                if (res.status === 200) {
-                    const data = await res.json();
-                    document.getElementById('title').innerText = data.item.name;
-                    document.getElementById('artist').innerText = data.item.artists[0].name;
+                const res = await spotify('/currently-playing?additional_types=episode');
+                if (res.status === 204) { isPlaying = false; setPlayIcon(); return; } // nothing playing
+                if (res.status !== 200) return;
+                const data = await res.json();
+                isPlaying = data.is_playing;
+                setPlayIcon();
+                const item = data.item;
+                if (!item) return; // ads have no song info
+                document.getElementById('title').innerText = item.name;
+                document.getElementById('artist').innerText = artistName(item);
+                const images = (item.album || item).images || [];
+                const newUrl = images[0] && images[0].url;
+                if (newUrl && newUrl !== lastArtUrl) {
+                    lastArtUrl = newUrl;
                     const img = document.getElementById('art');
-                    const newUrl = data.item.album.images[0].url;
-                    
-                    if (img.src !== newUrl) {
-                        img.crossOrigin = "anonymous";
-                        img.src = newUrl + '?cache=' + Date.now();
-                        img.onload = () => updateVibeColors(img);
-                    }
-
-                    const percent = (data.progress_ms / data.item.duration_ms) * 100;
-                    document.getElementById('progress-fill').style.width = percent + '%';
-                    document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
-                    document.getElementById('time-total').innerText = formatTime(data.item.duration_ms);
-                    document.getElementById('play-icon').innerHTML = data.is_playing ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => updateVibeColors(img);
+                    img.src = newUrl;
                 }
+
+                const percent = Math.min(100, (data.progress_ms / item.duration_ms) * 100);
+                document.getElementById('progress-fill').style.width = percent + '%';
+                document.getElementById('time-cur').innerText = formatTime(data.progress_ms);
+                document.getElementById('time-total').innerText = formatTime(item.duration_ms);
             } catch (e) { console.error(e); }
+        }
+
+        function artistName(item) {
+            if (item.artists) return item.artists.map(a => a.name).join(', ');
+            return item.show ? item.show.name : '';
+        }
+
+        function setPlayIcon() {
+            document.getElementById('play-icon').innerHTML = isPlaying ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
         }
 
         function updateVibeColors(img) {
@@ -197,13 +258,13 @@
                 // Sample pixels to find the most "vibrant" vibe (high saturation + reasonable brightness)
                 for (let i = 0; i < imageData.length; i += 16) {
                     const r = imageData[i], g = imageData[i+1], b = imageData[i+2];
-                    
+
                     // Simple saturation score
                     const max = Math.max(r, g, b);
                     const min = Math.min(r, g, b);
                     const saturation = (max === 0) ? 0 : (max - min) / max;
                     const brightness = max / 255;
-                    
+
                     // We want colors that are colorful but not too dark or purely white
                     const score = saturation * brightness;
 
@@ -214,28 +275,35 @@
 
                 // If the image is super muted/dark, boost the winner
                 let {r, g, b} = bestColor;
-                if (bestColor.score < 0.2) { r += 30; g += 30; b += 30; }
+                if (bestColor.score < 0.2) { r = Math.min(255, r + 30); g = Math.min(255, g + 30); b = Math.min(255, b + 30); }
 
                 const finalColor = `rgb(${r}, ${g}, ${b})`;
                 document.body.style.backgroundColor = finalColor;
                 document.getElementById('art-glow').style.background = finalColor;
-            } catch (e) { 
+            } catch (e) {
                 document.body.style.backgroundColor = '#121212';
             }
         }
 
         async function fetchQueue() {
             try {
-                const res = await fetch('https://api.spotify.com/v1/me/player/queue', { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const res = await spotify('/queue');
                 if (res.status === 200) {
                     const data = await res.json();
                     const container = document.getElementById('queue-list');
                     container.innerHTML = '';
-                    data.queue.slice(0, 5).forEach(track => {
+                    (data.queue || []).slice(0, 5).forEach((track, index) => {
                         const div = document.createElement('div');
                         div.className = 'queue-item flex items-center gap-6 p-4';
-                        div.onclick = () => playSpecific(track.uri);
-                        div.innerHTML = `<img src="${track.album.images[2].url}" class="w-20 h-20 rounded-2xl shadow-lg"><div class="overflow-hidden"><p class="bebas text-3xl truncate leading-none mb-2">${track.name}</p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest">${track.artists[0].name}</p></div>`;
+                        div.onclick = () => playSpecific(index);
+                        div.innerHTML = `<img class="w-20 h-20 rounded-2xl shadow-lg"><div class="overflow-hidden"><p class="bebas text-3xl truncate leading-none mb-2"></p><p class="text-sm opacity-40 truncate uppercase font-bold tracking-widest"></p></div>`;
+                        // textContent, not innerHTML, so names with < or & show correctly
+                        const images = (track.album || track).images || [];
+                        const thumb = images[images.length - 1];
+                        if (thumb) div.querySelector('img').src = thumb.url;
+                        const lines = div.querySelectorAll('p');
+                        lines[0].textContent = track.name;
+                        lines[1].textContent = artistName(track);
                         container.appendChild(div);
                     });
                 }
@@ -243,25 +311,23 @@
         }
 
         async function control(cmd) {
-            let method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
-            let endpoint = cmd;
-            if (cmd === 'toggle') {
-                const s = await (await fetch('https://api.spotify.com/v1/me/player/currently-playing', { headers: { 'Authorization': `Bearer ${accessToken}` } })).json();
-                endpoint = s.is_playing ? 'pause' : 'play';
-            }
-            await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, { method: method, headers: { 'Authorization': `Bearer ${accessToken}` } });
-            setTimeout(fetchPlayback, 400);
+            const method = (cmd === 'next' || cmd === 'previous') ? 'POST' : 'PUT';
+            const endpoint = cmd === 'toggle' ? (isPlaying ? 'pause' : 'play') : cmd;
+            if (cmd === 'toggle') { isPlaying = !isPlaying; setPlayIcon(); }
+            await spotify('/' + endpoint, { method });
+            setTimeout(updateLoop, 400);
         }
 
-        async function playSpecific(uri) {
-            await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ uris: [uri] }) });
+        // Skip ahead to the clicked song. Playing its URI directly would wipe out the rest of the queue and the Jam.
+        async function playSpecific(index) {
+            for (let i = 0; i <= index; i++) await spotify('/next', { method: 'POST' });
             setTimeout(updateLoop, 400);
         }
 
         function formatTime(ms) {
-            const min = Math.floor(ms / 60000);
-            const sec = ((ms % 60000) / 1000).toFixed(0);
-            return min + ":" + (sec < 10 ? '0' : '') + sec;
+            const total = Math.floor(ms / 1000);
+            const sec = total % 60;
+            return Math.floor(total / 60) + ":" + (sec < 10 ? '0' : '') + sec;
         }
     </script>
 </body>
