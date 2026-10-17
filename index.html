@@ -767,10 +767,11 @@
             setTimeout(() => old.forEach(o => o.remove()), 1900);
         }
 
-        function setVibe(color) {
+        // color = the album's main color, alt = its second color (bottom-right glow)
+        function setVibe(color, alt) {
+            alt = alt || color;
             document.body.style.setProperty('--vibe', color);
             const deep = `color-mix(in srgb, ${color} 40%, #08080b)`;
-            const alt = `color-mix(in srgb, ${color} 55%, #6a5cff)`;
             fadeLayer(document.getElementById('bg'), 'bg-layer',
                 `radial-gradient(45vw 45vw at 5% 0%, color-mix(in srgb, ${color} 75%, transparent), transparent 70%), ` +
                 `radial-gradient(40vw 40vw at 100% 100%, color-mix(in srgb, ${alt} 60%, transparent), transparent 70%), ` +
@@ -819,6 +820,7 @@
                 ctx.drawImage(img, 0, 0, 50, 50);
                 const imageData = ctx.getImageData(0, 0, 50, 50).data;
                 let bestColor = {r: 0, g: 0, b: 0, score: -1};
+                const candidates = [];
 
                 // Sample pixels to find the most "vibrant" vibe (high saturation + reasonable brightness)
                 for (let i = 0; i < imageData.length; i += 16) {
@@ -833,8 +835,24 @@
                     // We want colors that are colorful but not too dark or purely white
                     const score = saturation * brightness;
 
-                    if (score > bestColor.score && brightness > 0.1 && brightness < 0.9) {
-                        bestColor = {r, g, b, score};
+                    // The second color may be brighter (a yellow or a pastel), just not white
+                    if (brightness > 0.1 && saturation > 0.25) candidates.push({r, g, b, score});
+                    if (score > bestColor.score && brightness > 0.1 && brightness < 0.9) bestColor = {r, g, b, score};
+                }
+
+                // Second color: the most vibrant pixel whose hue is clearly different from the first.
+                // A one-color cover falls back to the pixel that looks most different, then to the first color.
+                const firstHue = hue(bestColor);
+                let second = null;
+                for (const c of candidates) {
+                    const diff = Math.abs(hue(c) - firstHue);
+                    if (Math.min(diff, 360 - diff) >= 35 && c.score > 0.12 && (!second || c.score > second.score)) second = c;
+                }
+                if (!second) {
+                    let far = 0;
+                    for (const c of candidates) {
+                        const d = Math.hypot(c.r - bestColor.r, c.g - bestColor.g, c.b - bestColor.b);
+                        if (d > 90 && d > far) { far = d; second = c; }
                     }
                 }
 
@@ -842,13 +860,20 @@
                 let {r, g, b} = bestColor;
                 if (bestColor.score < 0.2) { r = Math.min(255, r + 30); g = Math.min(255, g + 30); b = Math.min(255, b + 30); }
 
-                setVibe(`rgb(${r}, ${g}, ${b})`);
+                setVibe(`rgb(${r}, ${g}, ${b})`, second && `rgb(${second.r}, ${second.g}, ${second.b})`);
             } catch (e) {
                 setVibe('#121212');
             }
         }
 
         // ---------- Helpers ----------
+
+        function hue({r, g, b}) {
+            const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+            if (!d) return 0;
+            const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+            return (h * 60 + 360) % 360;
+        }
 
         function artistName(item) {
             if (item.artists) return item.artists.map(a => a.name).join(', ');
