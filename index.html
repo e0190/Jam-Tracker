@@ -155,6 +155,8 @@
         .step-btn:hover { transform: scale(1.03); }
         .fill-row { display: grid; grid-template-columns: 7.5rem 1fr auto; align-items: center; gap: .6rem; font-size: .85rem; color: var(--ink-3); }
         .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); padding: .35rem .55rem; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fill-box { min-width: 0; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .16); padding: .35rem .55rem; border-radius: 10px; outline: none; cursor: text; }
+        .fill-box:focus { border-color: rgb(255 255 255 / .5); }
         .copy { min-height: 32px; border: 1px solid var(--line-strong); border-radius: 999px; padding: .35rem .8rem; font: 600 .8rem var(--font); color: #fff; background: rgb(255 255 255 / .06); transition: background var(--fast); min-width: 4.2rem; }
         .copy:hover { background: var(--surface-hover); }
         .paste-row { display: flex; gap: .5rem; align-items: center; }
@@ -165,10 +167,6 @@
         #setup-error { color: #ffb3b3; text-align: center; font-size: .9rem; min-height: 1.2rem; }
         .launch { width: 100%; min-height: 56px; background: #fff; color: #0b0a12; border-radius: var(--r-md); padding: 1rem; font: 700 1.05rem var(--font); letter-spacing: -.01em; box-shadow: 0 12px 30px rgb(0 0 0 / .3), inset 0 -2px 0 rgb(0 0 0 / .06); transition: transform var(--fast) var(--ease); }
         .launch:hover { transform: scale(1.01); } .launch:active { transform: scale(.98); }
-        /* Jam link on the dashboard: an editable box, so a new Jam can be pasted without leaving */
-        .jam-link-box { width: 100%; min-height: 34px; padding: 6px 10px; border-radius: 10px; background: rgb(255 255 255 / .08); border: 1px solid rgb(255 255 255 / .16); color: var(--ink-2); font-size: .75rem; outline: none; box-shadow: inset 0 1px 2px rgb(0 0 0 / .2); transition: border-color var(--fast), color var(--fast); }
-        .qr-empty { width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; color: #b8b8c0; border: 2px dashed #d0d0d8; border-radius: 12px; }
-        .jam-link-box:focus { border-color: rgb(255 255 255 / .5); color: #fff; }
         #settings-btn { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 500; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .28), rgb(255 255 255 / .08)); border: 1px solid rgb(255 255 255 / .3); box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), 0 8px 24px rgb(0 0 0 / .2); opacity: 0; transform: scale(.85); pointer-events: none; transition: opacity .3s var(--ease), transform .3s var(--ease); }
         #settings-btn svg { width: 20px; height: 20px; }
         /* Hidden until the mouse comes near the top-right corner (or Tab reaches it) */
@@ -208,7 +206,7 @@
                     <p class="step-title">Fill in the form</p>
                     <div class="fill-row"><span>App name</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
                     <div class="fill-row"><span>App description</span><code>My Jam Tracker</code><button class="copy" onclick="copyText('My Jam Tracker', this)">Copy</button></div>
-                    <div class="fill-row"><span>Redirect URI</span><code id="redirect-display"></code><button class="copy" onclick="copyText(REDIRECT_URI, this)">Copy</button></div>
+                    <div class="fill-row"><label for="redirect-display">Redirect URI</label><input id="redirect-display" class="fill-box" type="text" readonly onfocus="this.select()" onclick="this.select()"><button class="copy" onclick="copyText(REDIRECT_URI, this)">Copy</button></div>
                     <p class="step-text">Paste the Redirect URI, click <b>Add</b>, tick <b>Web API</b>, tick the terms box, then click <b>Save</b>.</p>
                 </li>
                 <li>
@@ -308,7 +306,7 @@
                 <div class="overflow-hidden flex flex-col gap-1 flex-1 min-w-0">
                     <p style="font-size:1.05rem;font-weight:700;letter-spacing:-.01em;white-space:nowrap">Join the Jam</p>
                     <p style="font-size:.82rem;color:var(--ink-2)">Scan with your phone camera</p>
-                    <input id="jam-display-url" type="text" class="jam-link-box mono mt-1" aria-label="Jam link" placeholder="Paste a Jam link" autocomplete="off" spellcheck="false">
+                    <p id="jam-display-url" class="mono truncate" style="font-size:.75rem;color:var(--ink-3)"></p>
                 </div>
             </div>
         </div>
@@ -360,7 +358,7 @@
         // ---------- Setup screen ----------
 
         function fillSetup() {
-            document.getElementById('redirect-display').textContent = REDIRECT_URI;
+            document.getElementById('redirect-display').value = REDIRECT_URI;
             document.getElementById('client-id').value = settings.clientId || store.get('draft_client-id') || '';
             document.getElementById('lastfm-user').value = settings.lastfmUser || '';
             document.getElementById('lastfm-key').value = settings.lastfmKey || store.get('draft_lastfm-key') || '';
@@ -692,7 +690,7 @@
 
         function startApp() {
             provider = settings.connected === 'lastfm' ? lastfm : spotify;
-            const config = settings.config; // the Jam card shows even without a link, so one can be pasted in
+            const config = { ...settings.config, jam: settings.config.jam && !!settings.jam }; // no Jam link = no QR card
             const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
             document.getElementById('setup-overlay').style.display = 'none';
             document.getElementById('settings-btn').style.display = '';
@@ -709,7 +707,7 @@
             document.getElementById('artist').innerText = '';
             document.getElementById('main-dashboard').style.display = 'grid';
             setTimeout(() => document.getElementById('main-dashboard').style.opacity = '1', 50);
-            document.getElementById('jam-display-url').value = settings.jam || '';
+            document.getElementById('jam-display-url').textContent = settings.jam || '';
             drawJamQr();
             lastArtUrl = null;
             shownSong = '';
@@ -1062,27 +1060,11 @@
             }
         }
 
-        // ---------- Jam link box on the dashboard: edit it and the QR code follows ----------
-
         function drawJamQr() {
             const qr = document.getElementById('qrcode');
             qr.innerHTML = '';
             if (settings.jam) new QRCode(qr, { text: settings.jam, width: 96, height: 96 });
-            else qr.innerHTML = '<div class="qr-empty" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg></div>';
         }
-
-        let jamTimer = null;
-        document.getElementById('jam-display-url').addEventListener('input', e => {
-            clearTimeout(jamTimer);
-            jamTimer = setTimeout(() => {
-                const link = e.target.value.trim();
-                if (link === settings.jam) return;
-                settings.jam = link;
-                store.set('settings', settings);
-                drawJamQr();
-            }, 400); // wait until typing or pasting pauses
-        });
-        document.getElementById('jam-display-url').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 
         // ---------- Settings button: shows when the pointer is near the top-right corner ----------
 
