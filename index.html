@@ -163,11 +163,11 @@
         .fill-row { display: grid; grid-template-columns: 7.5rem 1fr auto; align-items: center; gap: .6rem; font-size: .85rem; color: var(--ink-3); }
         .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); padding: .35rem .55rem; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         /* The Jam link box on the Ready screen: brighter than other fields so it reads as a box on the glass */
-        .jam-field { background: rgb(255 255 255 / .14); border: 1px solid rgb(255 255 255 / .38); box-shadow: inset 0 1px 2px rgb(0 0 0 / .25), 0 0 0 4px rgb(255 255 255 / .04); }
-        /* Spell out the box's size: one browser squeezed it to zero width next to the Paste button */
-        #view-start #jam-input, .paste-row > .field { display: block !important; flex: 1 1 auto; min-width: 12rem; width: auto; height: 52px; visibility: visible !important; opacity: 1 !important; }
+        .soft-box { background: rgb(255 255 255 / .14); border: 1px solid rgb(255 255 255 / .38); box-shadow: inset 0 1px 2px rgb(0 0 0 / .25), 0 0 0 4px rgb(255 255 255 / .04); }
+        /* Spell out the box size. Its names stay neutral on purpose: an ad blocker hid it when it was called jam-input */
+        #view-start #session-url, .paste-row > .field { display: block !important; flex: 1 1 auto; min-width: 12rem; width: auto; height: 52px; visibility: visible !important; opacity: 1 !important; }
         .paste-row > .copy { flex: 0 0 auto; }
-        .jam-field::placeholder { color: rgb(255 255 255 / .7); }
+        .soft-box::placeholder { color: rgb(255 255 255 / .7); }
         .fill-box { min-width: 0; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .16); padding: .35rem .55rem; border-radius: 10px; outline: none; cursor: text; }
         .fill-box:focus { border-color: rgb(255 255 255 / .5); }
         .copy { min-height: 32px; border: 1px solid var(--line-strong); border-radius: 999px; padding: .35rem .8rem; font: 600 .8rem var(--font); color: #fff; background: rgb(255 255 255 / .06); transition: background var(--fast); min-width: 4.2rem; }
@@ -271,10 +271,10 @@
                 <h2 class="display text-4xl mb-3 text-center">Ready</h2>
                 <p class="text-center mb-6"><span class="badge" id="connected-as"></span></p>
                 <div class="space-y-3 mb-5">
-                    <label for="jam-input" class="block" style="font-size:.95rem;font-weight:600">Jam link <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+                    <label for="session-url" class="block" style="font-size:.95rem;font-weight:600">Jam link <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
                     <div class="paste-row">
-                        <input type="text" id="jam-input" placeholder="Paste your Spotify Jam invite link" class="field jam-field" autocomplete="off" spellcheck="false">
-                        <button class="copy" onclick="pasteInto('jam-input', this)">Paste</button>
+                        <input type="text" id="session-url" placeholder="Paste the link here" class="field soft-box" autocomplete="off" spellcheck="false">
+                        <button class="copy" onclick="pasteInto('session-url', this)">Paste</button>
                     </div>
                     <p class="step-text" style="font-size:.82rem">Friends scan a QR code on the screen to join.</p>
                     <div class="group mt-2">
@@ -378,7 +378,7 @@
             document.getElementById('client-id').value = settings.clientId || store.get('draft_client-id') || '';
             document.getElementById('lastfm-user').value = settings.lastfmUser || '';
             document.getElementById('lastfm-key').value = settings.lastfmKey || store.get('draft_lastfm-key') || '';
-            document.getElementById('jam-input').value = settings.jam || '';
+            document.getElementById('session-url').value = settings.jam || '';
             ['controls', 'progress', 'queue', 'jam'].forEach(k => document.getElementById('check-' + k).checked = settings.config[k] !== false);
             pickSource(settings.source || 'spotify');
             restoreChecklist();
@@ -558,7 +558,7 @@
         }
 
         function start() {
-            settings.jam = document.getElementById('jam-input').value.trim();
+            settings.jam = document.getElementById('session-url').value.trim();
             settings.config = {
                 controls: document.getElementById('check-controls').checked,
                 progress: document.getElementById('check-progress').checked,
