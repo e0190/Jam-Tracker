@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff3b7f"/>
+      <stop offset=".55" stop-color="#7b5cff"/>
+      <stop offset="1" stop-color="#22c3ff"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".45"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".12"/>
+    </linearGradient>
+    <path id="tile" d="M256 16C440 16 496 72 496 256S440 496 256 496 16 440 16 256 72 16 256 16Z"/>
+  </defs>
+  <!-- liquid-glass squircle: color, a sheen on the top half, a bright rim -->
+  <use href="#tile" fill="url(#bg)"/>
+  <use href="#tile" fill="url(#sheen)"/>
+  <use href="#tile" fill="none" stroke="url(#edge)" stroke-width="4"/>
+  <!-- beamed music notes -->
+  <g fill="#fff">
+    <path d="M206 150l166-34v210h-30V170l-106 22v168h-30z"/>
+    <ellipse cx="182" cy="362" rx="50" ry="38" transform="rotate(-20 182 362)"/>
+    <ellipse cx="318" cy="330" rx="50" ry="38" transform="rotate(-20 318 330)"/>
+  </g>
+</svg>

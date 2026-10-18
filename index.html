@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jam Tracker - E19</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0b0a12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Jam Tracker">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -157,6 +164,9 @@
         .fill-row code { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); padding: .35rem .55rem; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         /* The Jam link box on the Ready screen: brighter than other fields so it reads as a box on the glass */
         .jam-field { background: rgb(255 255 255 / .14); border: 1px solid rgb(255 255 255 / .38); box-shadow: inset 0 1px 2px rgb(0 0 0 / .25), 0 0 0 4px rgb(255 255 255 / .04); }
+        /* Spell out the box's size: one browser squeezed it to zero width next to the Paste button */
+        #view-start #jam-input, .paste-row > .field { display: block !important; flex: 1 1 auto; min-width: 12rem; width: auto; height: 52px; visibility: visible !important; opacity: 1 !important; }
+        .paste-row > .copy { flex: 0 0 auto; }
         .jam-field::placeholder { color: rgb(255 255 255 / .7); }
         .fill-box { min-width: 0; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: #fff; background: rgb(255 255 255 / .1); border: 1px solid rgb(255 255 255 / .16); padding: .35rem .55rem; border-radius: 10px; outline: none; cursor: text; }
         .fill-box:focus { border-color: rgb(255 255 255 / .5); }
