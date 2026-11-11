@@ -15,7 +15,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --vibe: #1e1e24;
@@ -189,6 +189,8 @@
         #settings-btn:hover, #tv-btn:hover { opacity: 1; }
         #tv-btn { position: fixed; top: 1.5rem; right: 5rem; z-index: 500; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgb(255 255 255 / .28), rgb(255 255 255 / .08)); border: 1px solid rgb(255 255 255 / .3); box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), 0 8px 24px rgb(0 0 0 / .2); opacity: 0; transform: scale(.85); pointer-events: none; transition: opacity .3s var(--ease), transform .3s var(--ease); }
         /* TV mode: the dashboard as a live video, ready to go full screen */
+        .theme-row { width: 100%; display: flex; align-items: center; gap: 10px; margin-top: .75rem; padding: 14px 18px; border-radius: var(--r-sm); border: 1px solid var(--line); background: rgb(255 255 255 / .06); color: var(--ink); font: 600 .95rem var(--font); cursor: pointer; text-align: left; }
+        .theme-row span:first-child { flex: 1; }
         #tv-overlay { position: fixed; inset: 0; z-index: 6000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; background: rgb(5 5 7 / .92); }
         #tv-video { width: min(100%, 1100px); aspect-ratio: 16 / 9; border-radius: 22px; corner-shape: squircle; background: #000; box-shadow: 0 30px 80px rgb(0 0 0 / .5); }
         .tv-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
@@ -276,6 +278,14 @@
             <button onclick="connect()" class="launch" id="launch-btn">Connect</button>
             </div>
 
+            <!-- Holidays and celebrations -->
+            <div id="view-theme" style="display:none">
+                <button class="ghost-btn mb-4" onclick="showStart()">← Back</button>
+                <h2 class="display text-4xl mb-5 text-center">Theme</h2>
+                <div id="jt-panel"></div>
+                <button onclick="showStart()" class="launch mt-6">Done</button>
+            </div>
+
             <!-- Every time after that: just the Jam link and what to show -->
             <div id="view-start" style="display:none">
                 <h2 class="display text-4xl mb-3 text-center">Ready</h2>
@@ -293,6 +303,7 @@
                         <label><span id="queue-label">Up Next queue</span><input type="checkbox" class="switch" id="check-queue" checked></label>
                         <label>Jam QR code<input type="checkbox" class="switch" id="check-jam" checked></label>
                     </div>
+                    <button type="button" onclick="showThemes()" class="theme-row"><span>Theme</span><span id="theme-label" style="color:var(--ink-3)"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
                 <button onclick="start()" class="launch">Start</button>
                 <button onclick="showSetupView()" class="ghost-btn mt-3 mx-auto flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</button>
@@ -518,6 +529,8 @@
         function showOverlay(view) {
             document.getElementById('view-setup').style.display = view === 'setup' ? '' : 'none';
             document.getElementById('view-start').style.display = view === 'start' ? '' : 'none';
+            document.getElementById('view-theme').style.display = view === 'theme' ? '' : 'none';
+            if (view === 'start' && window.JT) document.getElementById('theme-label').textContent = JT.label();
             document.getElementById('setup-overlay').style.display = 'flex';
             document.getElementById('setup-overlay').scrollTop = 0;
         }
@@ -542,6 +555,12 @@
             ['controls', 'progress'].forEach(k => document.getElementById('check-' + k).disabled = lf);
             document.getElementById('queue-label').textContent = lf ? 'Recently played' : 'Up Next queue';
             showOverlay('start');
+        }
+
+        function showThemes() {
+            if (!window.JT) return;
+            JT.ui();
+            showOverlay('theme');
         }
 
         function openSettings() {
@@ -987,6 +1006,7 @@
             alt = alt || color;
             document.body.style.setProperty('--vibe', color);
             document.body.style.setProperty('--vibe2', alt);
+            if (window.JT) JT.setAlbum(color, alt);
             const deep = `color-mix(in srgb, ${color} 40%, #08080b)`;
             const background =
                 `radial-gradient(45vw 45vw at 5% 0%, color-mix(in srgb, ${color} 75%, transparent), transparent 70%), ` +
@@ -1134,8 +1154,15 @@
         }
 
         // Frosted-glass card: the same sheen, edge light and shadow as the page
+        let tvLook = null;
         function glassCard(x, y, w, h, r) {
             const c = tv.ctx;
+            if (tvLook && !tvLook.glowOn) {
+                // formal themes: a flat card with a thin line, like the page
+                roundRect(x, y, w, h, r); c.fillStyle = tvLook.cardBg; c.fill();
+                c.strokeStyle = tvLook.cardLine; c.lineWidth = 1.5; c.stroke();
+                return;
+            }
             c.save();
             c.shadowColor = 'rgba(0,0,0,.3)'; c.shadowBlur = 60; c.shadowOffsetY = 24;
             roundRect(x, y, w, h, r);
@@ -1192,8 +1219,11 @@
             const body = document.body.style;
 
             // Colors glide toward the album's colors instead of jumping
-            const targetA = parseRgb(body.getPropertyValue('--vibe'), [30, 30, 36]);
-            const targetB = parseRgb(body.getPropertyValue('--vibe2'), targetA);
+            const look = tvLook = window.JT && JT.look();
+            const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+            const targetA = look ? hexRgb(look.cur.a) : parseRgb(body.getPropertyValue('--vibe'), [30, 30, 36]);
+            const targetB = look ? hexRgb(look.cur.b) : parseRgb(body.getPropertyValue('--vibe2'), targetA);
+            const ink = look ? look.ink : '#fff', ink2 = look ? look.ink2 : 'rgba(255,255,255,.75)';
             tv.colorA = tv.colorA ? mixRgb(tv.colorA, targetA, .06) : targetA;
             tv.colorB = tv.colorB ? mixRgb(tv.colorB, targetB, .06) : targetB;
             const A = tv.colorA, B = tv.colorB, deep = mixRgb(A, [8, 8, 11], .6);
@@ -1205,6 +1235,8 @@
             g = c.createRadialGradient(TV_W, TV_H, 0, TV_W, TV_H, TV_W * .45);
             g.addColorStop(0, rgbStr(B, .55)); g.addColorStop(1, rgbStr(B, 0));
             c.fillStyle = g; c.fillRect(0, 0, TV_W, TV_H);
+            if (look && !look.glowOn) { c.fillStyle = look.cur.a; c.fillRect(0, 0, TV_W, TV_H); }
+            if (look) JT.tvDraw(c, 'back');
 
             const sidebar = settings.config.queue || (settings.config.jam && settings.jam);
             const cx = sidebar ? 660 : TV_W / 2;
@@ -1223,17 +1255,18 @@
             const fade = Math.min(1, (now - tv.artChangedAt) / 700);
             if (tv.prevArt && fade < 1) drawCover(tv.prevArt, ax, ay, size, 52, 1 - fade);
             drawCover(tv.lastArt, ax, ay, size, 52, fade);
+            if (look) { JT.tvArt(ax, ay, size); JT.tvDraw(c, 'art'); }
 
             // Title and artist
             const title = document.getElementById('title').getAttribute('aria-label') || document.getElementById('title').textContent;
             const artist = document.getElementById('artist').textContent;
             c.textAlign = 'center'; c.textBaseline = 'alphabetic';
             const t = fitLines(title, sidebar ? 1020 : 1400, 84, 44, 800, 2);
-            c.fillStyle = '#fff'; c.font = `800 ${t.size}px ${TV_FONT}`;
+            c.fillStyle = ink; c.font = `800 ${t.size}px ${TV_FONT}`;
             let ty = ay + size + 40 + t.size;
             t.lines.forEach((line, i) => c.fillText(line, cx, ty + i * t.size * 1.05));
             ty += (t.lines.length - 1) * t.size * 1.05 + 52;
-            c.font = `500 38px ${TV_FONT}`; c.fillStyle = 'rgba(255,255,255,.75)';
+            c.font = `500 38px ${TV_FONT}`; c.fillStyle = ink2;
             c.fillText(ellipsize(artist, sidebar ? 1000 : 1400), cx, ty);
 
             // Progress bar (Spotify only: Last.fm doesn't know the position)
@@ -1242,7 +1275,7 @@
                 roundRect(bx, by, bw, 8, 4); c.fillStyle = 'rgba(255,255,255,.18)'; c.fill();
                 c.save(); roundRect(bx, by, bw, 8, 4); c.clip();
                 c.shadowColor = 'rgba(255,255,255,.7)'; c.shadowBlur = 14;
-                c.fillStyle = '#fff'; c.fillRect(bx, by, bw * pos / clock.duration, 8);
+                c.fillStyle = look ? look.cur.bar : '#fff'; c.fillRect(bx, by, bw * pos / clock.duration, 8);
                 c.restore();
                 c.font = `500 24px 'JetBrains Mono', monospace`; c.fillStyle = 'rgba(255,255,255,.75)';
                 c.textAlign = 'right'; c.fillText(formatTime(pos), bx - 22, by + 10);
@@ -1257,7 +1290,7 @@
             // Up Next / Recently played
             if (settings.config.queue) {
                 glassCard(sx, 90, sw, qh, 48);
-                c.textAlign = 'left'; c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `700 26px ${TV_FONT}`;
+                c.textAlign = 'left'; c.fillStyle = ink2; c.font = `700 26px ${TV_FONT}`;
                 c.fillText(document.getElementById('queue-title').textContent, sx + 44, 158);
                 const rows = [...document.querySelectorAll('#queue-list .queue-item')]; // all of them: the TV has its own room
                 const fits = Math.floor((qh - 120) / 104);
@@ -1267,9 +1300,9 @@
                     roundRect(sx + 40, y, 80, 80, 20); c.fillStyle = 'rgba(255,255,255,.1)'; c.fill();
                     drawCover(img, sx + 40, y, 80, 20, 1);
                     const [name, by] = row.querySelectorAll('p');
-                    c.fillStyle = '#fff'; c.font = `700 32px ${TV_FONT}`;
+                    c.fillStyle = ink; c.font = `700 32px ${TV_FONT}`;
                     c.fillText(ellipsize(name.textContent, sw - 190), sx + 144, y + 36);
-                    c.fillStyle = 'rgba(255,255,255,.7)'; c.font = `600 24px ${TV_FONT}`;
+                    c.fillStyle = ink2; c.font = `600 24px ${TV_FONT}`;
                     c.fillText(ellipsize(by.textContent, sw - 190), sx + 144, y + 70);
                 });
             }
@@ -1281,11 +1314,17 @@
                 roundRect(sx + 30, jy + 25, 150, 150, 26); c.fillStyle = '#fff'; c.fill();
                 const qr = document.querySelector('#qrcode canvas');
                 if (qr) c.drawImage(qr, sx + 41, jy + 36, 128, 128);
-                c.textAlign = 'left'; c.fillStyle = '#fff'; c.font = `700 36px ${TV_FONT}`;
+                c.textAlign = 'left'; c.fillStyle = ink; c.font = `700 36px ${TV_FONT}`;
                 c.fillText('Join the Jam', sx + 214, jy + 92);
-                c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `500 26px ${TV_FONT}`;
+                c.fillStyle = ink2; c.font = `500 26px ${TV_FONT}`;
                 c.fillText('Scan with your phone camera', sx + 214, jy + 134);
             }
+        }
+
+        // The dashboard, then the theme's front decorations (garlands, confetti, greeting) on top
+        function drawTvFrame() {
+            drawTv();
+            if (window.JT && JT.look()) JT.tvDraw(tv.ctx, 'front');
         }
 
         function startTvMode() {
@@ -1298,7 +1337,8 @@
                 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && tv.timer) stopTvMode(); });
             }
             drawTv();
-            if (!tv.timer) tv.timer = setInterval(drawTv, 1000 / 30);
+            if (window.JT) JT.tvStart();
+            if (!tv.timer) tv.timer = setInterval(drawTvFrame, 1000 / 30);
             tv.video.srcObject = tv.canvas.captureStream(30);
             document.getElementById('tv-overlay').style.display = 'flex';
             tv.video.play().catch(() => {});
@@ -1323,6 +1363,7 @@
 
         function stopTvMode() {
             clearInterval(tv.timer); tv.timer = null;
+            if (window.JT) JT.tvStop();
             if (tv.video && tv.video.srcObject) { tv.video.srcObject.getTracks().forEach(t => t.stop()); tv.video.srcObject = null; }
             document.getElementById('tv-overlay').style.display = 'none';
             if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -1375,5 +1416,6 @@
             return Math.floor(total / 60) + ":" + (sec < 10 ? '0' : '') + sec;
         }
     </script>
+    <script src="/themes.js"></script>
 </body>
 </html>
